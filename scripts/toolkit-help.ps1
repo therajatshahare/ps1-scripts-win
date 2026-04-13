@@ -56,20 +56,37 @@ switch ($Command.ToLower()) {
         Write-Host "Example:"
         Write-Host "  ytvideo 2k ""video"" ""https://youtu.be/..."""
         Write-Host ""
-        Write-Host "Resolutions: 4k, 2k, 1080p, 720p, 480p, 360p, 240p"
+        Write-Host "Resolutions:"
+        Write-Host "  4k, 2k, 1080p, 720p, 480p, 360p, 240p"
+        Write-Host ""
+        Write-Host "Notes:"
+        Write-Host "  • No resolution = best/original quality"
+        Write-Host "  • Output format: MKV"
     }
 
     "vytvideo" {
         Write-Host "vytvideo [res] ""name"" ""url""" -ForegroundColor Cyan
         Write-Host "Download vertical videos (Reels/Shorts)"
+        Write-Host ""
+        Write-Host "Example:"
+        Write-Host "  vytvideo 2k ""video"" ""https://youtu.be/..."""
+        Write-Host ""
+        Write-Host "Notes:"
+        Write-Host "  • Uses same resolution options as ytvideo"
+        Write-Host "  • Output format: MKV"
     }
 
     "ytaudio" {
         Write-Host "ytaudio ""name"" ""url""" -ForegroundColor Cyan
         Write-Host "Extract audio in FLAC format"
         Write-Host ""
-        Write-Host "Example:"
+        Write-Host "Examples:"
         Write-Host "  ytaudio ""song"" ""https://youtu.be/..."""
+        Write-Host "  ytaudio ""https://youtu.be/..."""
+        Write-Host ""
+        Write-Host "Notes:"
+        Write-Host "  • Best quality audio (FLAC)"
+        Write-Host "  • Metadata and thumbnail embedded"
     }
 
     "exifpic" {
@@ -78,7 +95,14 @@ switch ($Command.ToLower()) {
         Write-Host ""
         Write-Host "Examples:"
         Write-Host "  exifpic ""2024:01:01 10:00"""
+        Write-Host "    → Apply to all JPG/PNG in current folder"
+        Write-Host ""
         Write-Host "  exifpic ""2024:01:01 10:00"" ""image.jpg"""
+        Write-Host "    → Apply to specific file"
+        Write-Host ""
+        Write-Host "Notes:"
+        Write-Host "  • Format: YYYY:MM:DD HH:MM"
+        Write-Host "  • Overwrites original metadata"
     }
 
     "insta" {
@@ -87,7 +111,18 @@ switch ($Command.ToLower()) {
         Write-Host ""
         Write-Host "Examples:"
         Write-Host "  insta username"
+        Write-Host "    → Full download (default)"
+        Write-Host ""
         Write-Host "  insta username update"
+        Write-Host "    → Download only new posts"
+        Write-Host ""
+        Write-Host "Modes:"
+        Write-Host "  full    → Download all posts"
+        Write-Host "  update  → Download only new posts (fast)"
+        Write-Host ""
+        Write-Host "Notes:"
+        Write-Host "  • Requires login (saved session)"
+        Write-Host "  • Files saved in current directory"
     }
 
     default {
