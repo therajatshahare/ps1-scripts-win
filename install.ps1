@@ -111,7 +111,7 @@ Write-Host "`nConfiguring PowerShell profile..." -ForegroundColor Cyan
 
 $profileBlock = @"
 # ===== Cmd-Scripts Setup =====
-`$scriptDir = "`$HOME\cmd-scripts"
+`$scriptDir = "$targetDir"
 
 if (!(Test-Path `$scriptDir)) {
     Write-Host "Warning: Script directory not found: `$scriptDir" -ForegroundColor Red
