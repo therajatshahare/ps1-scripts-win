@@ -124,6 +124,30 @@ switch ($Command.ToLower()) {
         Write-Host "  • Requires login (saved session)"
         Write-Host "  • Files saved in current directory"
     }
+    "showmeta" {
+        Write-Host "showmeta ""file""" -ForegroundColor Cyan
+        Write-Host "Display full media metadata"
+        Write-Host ""
+        Write-Host "Example:"
+        Write-Host "  showmeta ""video.mkv"""
+    }
+
+    "showformat" {
+        Write-Host "showformat ""file/url""" -ForegroundColor Cyan
+        Write-Host "Display format and stream details"
+        Write-Host ""
+        Write-Host "Examples:"
+        Write-Host "  showformat ""video.mkv"""
+        Write-Host "  showformat ""https://youtu.be/..."""
+    }
+
+    "showlyrics" {
+        Write-Host "showlyrics ""file""" -ForegroundColor Cyan
+        Write-Host "Fetch and embed lyrics into audio file"
+        Write-Host ""
+        Write-Host "Example:"
+        Write-Host "  showlyrics ""song.flac"""
+    }
 
     default {
         Write-Host "Unknown command: $Command" -ForegroundColor Red
