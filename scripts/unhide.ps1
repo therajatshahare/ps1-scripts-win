@@ -6,15 +6,16 @@ param(
 # -------------------------------
 # Validate path
 # -------------------------------
-if (-not (Test-Path $file -Force)) {
-    Write-Host "File not found: $file"
+$item = Get-Item $file -Force -ErrorAction SilentlyContinue
+
+if (-not $item) {
+    Write-Host "File or folder not found: $file" -ForegroundColor Red
     exit 1
 }
 
 # -------------------------------
 # Remove Hidden + System + ReadOnly
 # -------------------------------
-$item = Get-Item $file -Force
 
 $item.Attributes = $item.Attributes `
     -band (-bnot [System.IO.FileAttributes]::Hidden) `
