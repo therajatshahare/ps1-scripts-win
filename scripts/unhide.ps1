@@ -4,7 +4,7 @@ param(
 )
 
 # -------------------------------
-# Validate path
+# Get item safely
 # -------------------------------
 $item = Get-Item $file -Force -ErrorAction SilentlyContinue
 
@@ -14,12 +14,24 @@ if (-not $item) {
 }
 
 # -------------------------------
-# Remove Hidden + System + ReadOnly
+# If folder → unhide everything inside
 # -------------------------------
+if ($item.PSIsContainer) {
 
+    Get-ChildItem $file -Recurse -Force | ForEach-Object {
+        $_.Attributes = $_.Attributes `
+            -band (-bnot [System.IO.FileAttributes]::Hidden) `
+            -band (-bnot [System.IO.FileAttributes]::System) `
+            -band (-bnot [System.IO.FileAttributes]::ReadOnly)
+    }
+}
+
+# -------------------------------
+# Unhide main item
+# -------------------------------
 $item.Attributes = $item.Attributes `
     -band (-bnot [System.IO.FileAttributes]::Hidden) `
     -band (-bnot [System.IO.FileAttributes]::System) `
     -band (-bnot [System.IO.FileAttributes]::ReadOnly)
 
-Write-Host "File '$file' is now visible."
+Write-Host "File/folder '$file' is now fully visible."
