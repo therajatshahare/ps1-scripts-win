@@ -6,7 +6,7 @@ param(
 # -------------------------------
 # Validate path
 # -------------------------------
-if (-not (Test-Path $file)) {
+if (-not (Test-Path $file -Force)) {
     Write-Host "File not found: $file"
     exit 1
 }
@@ -14,7 +14,7 @@ if (-not (Test-Path $file)) {
 # -------------------------------
 # Remove Hidden + System + ReadOnly
 # -------------------------------
-$item = Get-Item $file
+$item = Get-Item $file -Force
 
 $item.Attributes = $item.Attributes `
     -band (-bnot [System.IO.FileAttributes]::Hidden) `
