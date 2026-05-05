@@ -13,10 +13,82 @@ param(
 # -------------------------------
 $ConfigDir = Join-Path $env:LOCALAPPDATA "Instaloader"
 $ConfigFile = Join-Path $ConfigDir "insta-accounts.json"
+$EfsBackupMarker = Join-Path $ConfigDir ".efs-backup-reminder.done"
 
 if (-not (Test-Path $ConfigDir)) {
     New-Item -ItemType Directory -Path $ConfigDir | Out-Null
 }
+
+# -------------------------------
+# Protect Instaloader session/config files with Windows EFS
+# -------------------------------
+function Protect-InstaloaderData {
+    param(
+        [string]$FolderPath,
+        [string]$BackupMarkerPath
+    )
+
+    if (-not (Test-Path $FolderPath)) {
+        return
+    }
+
+    Write-Host "Checking Instaloader data protection..." -ForegroundColor DarkGray
+
+    try {
+        # Encrypt folder so new files added later are encrypted automatically
+        cipher /E "$FolderPath" | Out-Null
+
+        # Encrypt existing files inside the folder
+        cipher /E /A "$FolderPath\*" | Out-Null
+
+        Write-Host "Instaloader session/config folder is protected with Windows EFS." -ForegroundColor Green
+    }
+    catch {
+        Write-Host "Warning: Could not apply EFS encryption to Instaloader folder." -ForegroundColor Yellow
+    }
+
+    # Ask once for EFS certificate backup
+    if (-not (Test-Path $BackupMarkerPath)) {
+        Write-Host ""
+        Write-Host "Important: Your Instaloader session files are now encrypted." -ForegroundColor Yellow
+        Write-Host "You should back up your Windows EFS certificate as a .pfx file." -ForegroundColor Yellow
+        Write-Host "Without this backup, encrypted files may become unreadable after Windows reinstall." -ForegroundColor Yellow
+        Write-Host ""
+
+        $BackupChoice = Read-Host "Create EFS certificate backup on Desktop now? (y/n)"
+
+        if ($BackupChoice -eq "y" -or $BackupChoice -eq "Y") {
+            try {
+                $BackupPath = Join-Path $HOME "Desktop\EFS-Backup"
+                cipher /x "$BackupPath"
+
+                Write-Host ""
+                Write-Host "EFS backup created on Desktop." -ForegroundColor Green
+                Write-Host "Keep the .pfx file and its password very safe." -ForegroundColor Yellow
+            }
+            catch {
+                Write-Host "Warning: EFS backup command failed. You can run it manually later:" -ForegroundColor Yellow
+                Write-Host "cipher /x `"$HOME\Desktop\EFS-Backup`"" -ForegroundColor Cyan
+            }
+        }
+        else {
+            Write-Host "Skipped EFS backup. You can create it later with:" -ForegroundColor Yellow
+            Write-Host "cipher /x `"$HOME\Desktop\EFS-Backup`"" -ForegroundColor Cyan
+        }
+
+        # Create marker so the script does not ask every time
+        "EFS backup reminder shown on $(Get-Date)" |
+            Set-Content -Path $BackupMarkerPath -Encoding UTF8
+
+        # Encrypt marker too
+        try {
+            cipher /E /A "$BackupMarkerPath" | Out-Null
+        } catch {}
+    }
+}
+
+# Apply protection early
+Protect-InstaloaderData -FolderPath $ConfigDir -BackupMarkerPath $EfsBackupMarker
 
 # Create account config file if missing
 if (-not (Test-Path $ConfigFile)) {
@@ -29,6 +101,11 @@ if (-not (Test-Path $ConfigFile)) {
     $defaultAccounts |
         ConvertTo-Json |
         Set-Content -Path $ConfigFile -Encoding UTF8
+
+    # Encrypt newly created config file
+    try {
+        cipher /E /A "$ConfigFile" | Out-Null
+    } catch {}
 }
 
 # Load account config
@@ -44,9 +121,14 @@ else {
     # If the account slot does not exist, create it
     if (-not $accounts.ContainsKey($Account)) {
         $accounts[$Account] = ""
+
         $accounts |
             ConvertTo-Json |
             Set-Content -Path $ConfigFile -Encoding UTF8
+
+        try {
+            cipher /E /A "$ConfigFile" | Out-Null
+        } catch {}
     }
 
     $LoginUser = $accounts[$Account]
@@ -65,6 +147,10 @@ else {
                 $accounts |
                     ConvertTo-Json |
                     Set-Content -Path $ConfigFile -Encoding UTF8
+
+                try {
+                    cipher /E /A "$ConfigFile" | Out-Null
+                } catch {}
 
                 Write-Host "Saved '$LoginUser' to account slot $Account." -ForegroundColor Green
             }
@@ -98,6 +184,12 @@ switch ($Mode) {
         instaloader --login $LoginUser $Username
     }
 }
+
+# After Instaloader runs, encrypt any newly created session files
+try {
+    cipher /E "$ConfigDir" | Out-Null
+    cipher /E /A "$ConfigDir\*" | Out-Null
+} catch {}
 
 # -------------------------------
 # Proper result handling
