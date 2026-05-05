@@ -1,4 +1,4 @@
-$toolkitVersion = "1.2.00"
+$toolkitVersion = "1.2.01"
 Write-Host "ps1-scripts-win Version: $toolkitVersion"
 # ================================
 # Personal Cmd-Scripts Installer
