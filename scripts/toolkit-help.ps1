@@ -9,8 +9,11 @@ Write-Host ""
 # ===============================
 if (-not $Command) {
 
-    Write-Host "=== ps1-scripts-win Toolkit Help ===" -ForegroundColor Cyan
-    Write-Host "Note: All the scripts will be saved on "$HOME\ps1-scripts-win" path." -ForegroundColor Green
+    Write-Host "" -ForegroundColor Cyan
+    Write-Host "╔══════════════════════════════════════╗" -ForegroundColor Green
+    Write-Host "║      🚀 ps1-scripts-win Help        ║" -ForegroundColor Green
+    Write-Host "╚══════════════════════════════════════╝" -ForegroundColor Green
+    Write-Host "Note: All the scripts will be saved on your "$HOME\ps1-scripts-win" directory." -ForegroundColor Cyan
 
     Write-Host "`n🎥 Media Commands" -ForegroundColor Yellow
     Write-Host "  ytvideo    → Download YouTube video"
