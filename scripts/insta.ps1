@@ -14,7 +14,7 @@ param(
 # You can keep only account 1 here if you want
 # -------------------------------
 $accounts = @{
-    "1" = "aroallfather"
+    "1" = ""
     "2" = ""
     "3" = ""
 }
