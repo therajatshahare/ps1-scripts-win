@@ -5,21 +5,39 @@ param(
     [ValidateSet("full", "update")]
     [string]$Mode = "full",
 
-    [ValidateSet("1", "2", "3")]
+    [ValidateSet("1", "2", "3", "ask")]
     [string]$Account = "1"
 )
 
 # -------------------------------
-# Instagram login accounts
-# Change account 2 and 3 with your real usernames
+# Optional saved Instagram login accounts
+# You can keep only account 1 here if you want
 # -------------------------------
 $accounts = @{
     "1" = "aroallfather"
-    "2" = "your_second_username"
-    "3" = "your_third_username"
+    "2" = ""
+    "3" = ""
 }
 
-$LoginUser = $accounts[$Account]
+# -------------------------------
+# Choose login account
+# -------------------------------
+if ($Account -eq "ask") {
+    $LoginUser = Read-Host "Enter Instagram login username"
+}
+else {
+    $LoginUser = $accounts[$Account]
+
+    if ([string]::IsNullOrWhiteSpace($LoginUser)) {
+        Write-Host "No username saved for account $Account." -ForegroundColor Yellow
+        $LoginUser = Read-Host "Enter Instagram login username"
+    }
+}
+
+if ([string]::IsNullOrWhiteSpace($LoginUser)) {
+    Write-Host "No login username entered. Exiting." -ForegroundColor Red
+    exit 1
+}
 
 # DO NOT change directory → use current working directory instead
 # Fixes permission issue when script is inside C:\Windows
