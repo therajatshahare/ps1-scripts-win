@@ -5,19 +5,34 @@ param(
     [ValidateSet("full", "update")]
     [string]$Mode = "full",
 
-    [ValidateSet("1", "2", "3", "ask")]
     [string]$Account = "1"
 )
 
 # -------------------------------
-# Optional saved Instagram login accounts
-# You can keep only account 1 here if you want
+# Account config file
 # -------------------------------
-$accounts = @{
-    "1" = ""
-    "2" = ""
-    "3" = ""
+$ConfigDir = Join-Path $env:LOCALAPPDATA "Instaloader"
+$ConfigFile = Join-Path $ConfigDir "insta-accounts.json"
+
+if (-not (Test-Path $ConfigDir)) {
+    New-Item -ItemType Directory -Path $ConfigDir | Out-Null
 }
+
+# Create account config file if missing
+if (-not (Test-Path $ConfigFile)) {
+    $defaultAccounts = @{
+        "1" = ""
+        "2" = ""
+        "3" = ""
+    }
+
+    $defaultAccounts |
+        ConvertTo-Json |
+        Set-Content -Path $ConfigFile -Encoding UTF8
+}
+
+# Load account config
+$accounts = Get-Content $ConfigFile -Raw | ConvertFrom-Json -AsHashtable
 
 # -------------------------------
 # Choose login account
@@ -26,11 +41,34 @@ if ($Account -eq "ask") {
     $LoginUser = Read-Host "Enter Instagram login username"
 }
 else {
+    # If the account slot does not exist, create it
+    if (-not $accounts.ContainsKey($Account)) {
+        $accounts[$Account] = ""
+        $accounts |
+            ConvertTo-Json |
+            Set-Content -Path $ConfigFile -Encoding UTF8
+    }
+
     $LoginUser = $accounts[$Account]
 
+    # If account slot is blank, ask username
     if ([string]::IsNullOrWhiteSpace($LoginUser)) {
         Write-Host "No username saved for account $Account." -ForegroundColor Yellow
         $LoginUser = Read-Host "Enter Instagram login username"
+
+        if (-not [string]::IsNullOrWhiteSpace($LoginUser)) {
+            $SaveChoice = Read-Host "Save '$LoginUser' to account slot $Account? (y/n)"
+
+            if ($SaveChoice -eq "y" -or $SaveChoice -eq "Y") {
+                $accounts[$Account] = $LoginUser
+
+                $accounts |
+                    ConvertTo-Json |
+                    Set-Content -Path $ConfigFile -Encoding UTF8
+
+                Write-Host "Saved '$LoginUser' to account slot $Account." -ForegroundColor Green
+            }
+        }
     }
 }
 
@@ -46,7 +84,9 @@ Write-Host "Processing profile: $Username" -ForegroundColor Cyan
 Write-Host "Using login account: $LoginUser" -ForegroundColor Cyan
 Write-Host "Download location: $(Get-Location)" -ForegroundColor DarkGray
 
+# -------------------------------
 # Execute based on mode
+# -------------------------------
 switch ($Mode) {
     "update" {
         Write-Host "Running FAST UPDATE mode..." -ForegroundColor Yellow
@@ -59,7 +99,9 @@ switch ($Mode) {
     }
 }
 
+# -------------------------------
 # Proper result handling
+# -------------------------------
 if ($LASTEXITCODE -eq 0) {
     Write-Host "Operation completed successfully!" -ForegroundColor Green
 
