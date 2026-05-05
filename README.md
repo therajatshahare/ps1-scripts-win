@@ -1,4 +1,4 @@
-# ⚙️ Cmd-Scripts Toolkit
+# ⚙️ "ps1-scripts-win" Toolkit
 
 A personal **PowerShell CLI toolkit** for everyday automation, media handling, and utilities — install everything with **one command**.
 
@@ -19,7 +19,7 @@ irm https://raw.githubusercontent.com/therajatshahare/ps1-scripts-win/main/insta
 * Installs all scripts to:
 
   ```
-  $HOME\cmd-scripts
+  $HOME\ps1-scripts-win
   ```
 * Adds scripts to PATH
 * Configures PowerShell profile automatically
@@ -120,7 +120,7 @@ Restart PowerShell after setting.
 ## 📦 Project Structure
 
 ```
-cmd-scripts/
+ps1-scripts-win/
 │
 ├── install.ps1
 └── scripts/
