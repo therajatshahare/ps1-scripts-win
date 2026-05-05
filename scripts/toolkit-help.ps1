@@ -9,7 +9,8 @@ Write-Host ""
 # ===============================
 if (-not $Command) {
 
-    Write-Host "=== Cmd-Scripts Toolkit Help ===" -ForegroundColor Cyan
+    Write-Host "=== ps1-scripts-win Toolkit Help ===" -ForegroundColor Cyan
+    Write-Host "Note: All the scripts will be saved on "$HOME\ps1-scripts-win" path." -ForegroundColor Green
 
     Write-Host "`n🎥 Media Commands" -ForegroundColor Yellow
     Write-Host "  ytvideo    → Download YouTube video"
