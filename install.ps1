@@ -18,7 +18,7 @@ $branch   = "main"
 $baseRaw = "https://raw.githubusercontent.com/$repoUser/$repoName/$branch"
 
 # Target paths
-$targetDir = "C:\Windows\cmd-scripts"
+$targetDir = "C:\Windows\ps1-scripts-win"
 $profileDir = "$HOME\Documents\PowerShell"
 $profilePath = $PROFILE
 
@@ -51,7 +51,7 @@ $admin = ([Security.Principal.WindowsPrincipal] `
 
 if (-not $admin) {
     Write-Host "⚠ Not running as Administrator. Switching to user directory..." -ForegroundColor Yellow
-    $targetDir = "$HOME\cmd-scripts"
+    $targetDir = "$HOME\ps1-scripts-win"
 }
 
 # -------------------------------
