@@ -70,9 +70,14 @@ aria
 
 ### 📸 Instagram
 
+* To add the user accounts use "ask" command. It'll trigger to add the new user account ID & Password. If the new account detected then it'll ask to save the userid and allot the specific number ex. 1,2,3,... etc.
 ```powershell
-insta <username> full
-insta <username> update
+insta <username> full ask
+```
+* Once the account get allotment number after that user can use that number to trigger the account to use for the session.
+```powershell
+insta <username> full "1/2/3/..."
+insta <username> update "1/2/3/..."
 ```
 
 ### 🔁 Toolkit Update
