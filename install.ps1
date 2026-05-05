@@ -1,12 +1,15 @@
-$toolkitVersion = "1.0.0"
-Write-Host "Cmd-Scripts Version: $toolkitVersion"
+$toolkitVersion = "1.2.00"
+Write-Host "ps1-scripts-win Version: $toolkitVersion"
 # ================================
 # Personal Cmd-Scripts Installer
 # ================================
 
 $ErrorActionPreference = "Stop"
 
-Write-Host "=== Cmd-Scripts Setup Starting ===" -ForegroundColor Cyan
+Write-Host "╔══════════════════════════════════════╗" -ForegroundColor Green
+Write-Host "║            ps1-scripts-win           ║" -ForegroundColor Green
+Write-Host "║            Setup Starting            ║" -ForegroundColor Green
+Write-Host "╚══════════════════════════════════════╝" -ForegroundColor Green
 
 # -------------------------------
 # CONFIG
@@ -110,7 +113,7 @@ if (!(Test-Path $profileDir)) {
 Write-Host "`nConfiguring PowerShell profile..." -ForegroundColor Cyan
 
 $profileBlock = @"
-# ===== Cmd-Scripts Setup =====
+# ===== ps1-scripts-win Setup =====
 `$scriptDir = "$targetDir"
 
 if (!(Test-Path `$scriptDir)) {
@@ -137,7 +140,7 @@ function folders  { & "`$scriptDir\folders.ps1" @args }
 function insta    { & "`$scriptDir\insta.ps1" @args }
 
 function toolkit-version {
-    Write-Host "Cmd-Scripts Version: $($toolkitVersion)"
+    Write-Host "ps1-scripts-win Version: $($toolkitVersion)"
 }
 
 function update-scripts {
@@ -147,7 +150,7 @@ function update-scripts {
 function toolkit-help {
     & "$scriptDir\toolkit-help.ps1" @args
 }
-# ===== End Cmd-Scripts =====
+# ===== End ps1-scripts-win Script Setup =====
 "@
 
 # Ensure profile file exists
@@ -162,7 +165,7 @@ try {
 } catch {}
 
 # Remove old block if exists
-$content = $content -replace '(?s)# ===== Cmd-Scripts Setup =====.*?# ===== End Cmd-Scripts =====', ''
+$content = $content -replace '(?s)# ===== ps1-scripts-win Setup =====.*?# ===== End ps1-scripts-win =====', ''
 
 # Write everything cleanly (CRITICAL FIX)
 $newContent = $content.Trim() + "`n`n" + $profileBlock
