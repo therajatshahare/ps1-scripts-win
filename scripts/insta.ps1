@@ -62,7 +62,37 @@ switch ($Mode) {
 # Proper result handling
 if ($LASTEXITCODE -eq 0) {
     Write-Host "Operation completed successfully!" -ForegroundColor Green
-} else {
+
+    # -------------------------------
+    # Move .json.xz and .txt files to json-data folder
+    # -------------------------------
+    $ProfileFolder = Join-Path (Get-Location) $Username
+    $JsonDataFolder = Join-Path $ProfileFolder "json-data"
+
+    if (Test-Path $ProfileFolder) {
+        if (-not (Test-Path $JsonDataFolder)) {
+            New-Item -ItemType Directory -Path $JsonDataFolder | Out-Null
+            Write-Host "Created metadata folder: json-data" -ForegroundColor DarkGray
+        }
+
+        $MetadataFiles = Get-ChildItem -Path $ProfileFolder -File |
+            Where-Object {
+                $_.Name -like "*.json.xz" -or $_.Name -like "*.txt"
+            }
+
+        if ($MetadataFiles.Count -gt 0) {
+            $MetadataFiles | Move-Item -Destination $JsonDataFolder -Force
+            Write-Host "Moved $($MetadataFiles.Count) metadata file(s) to json-data folder." -ForegroundColor Green
+        }
+        else {
+            Write-Host "No .json.xz or .txt files found to move." -ForegroundColor DarkGray
+        }
+    }
+    else {
+        Write-Host "Profile folder not found: $ProfileFolder" -ForegroundColor Yellow
+    }
+}
+else {
     Write-Host "Operation failed. Check credentials, session, or connection." -ForegroundColor Red
 
     if ($Host.Name -eq 'ConsoleHost') {
