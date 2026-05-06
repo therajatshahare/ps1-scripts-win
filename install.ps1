@@ -1,4 +1,4 @@
-$toolkitVersion = "1.2.01"
+$toolkitVersion = "1.2.02"
 Write-Host "ps1-scripts-win Version: $toolkitVersion"
 # ================================
 # Personal Cmd-Scripts Installer
@@ -41,6 +41,7 @@ $scripts = @(
     "exifpic.ps1",
     "folders.ps1",
     "insta.ps1",
+    "encrypt.ps1",
     "lyrics.py",
     "toolkit-help.ps1"
 )
