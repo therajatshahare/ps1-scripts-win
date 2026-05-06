@@ -138,6 +138,7 @@ ps1-scripts-win/
     ├── exifpic.ps1
     ├── folders.ps1
     ├── insta.ps1
+    ├── encrypt.ps1
     ├── toolkit-help.ps1
     └── lyrics.py
 ```
