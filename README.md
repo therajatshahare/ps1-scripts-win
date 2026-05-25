@@ -3,8 +3,13 @@
 A personal **PowerShell CLI toolkit** for everyday automation, media handling, and utilities — install everything with **one command**.
 
 ---
+## Open a PowerShell terminal (version 5.1 or later) and from the PS C:\> prompt, run:
 
-## 🚀 One-Line Install
+```powershell
+Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
+```
+
+## 🚀 Then, One-Line Install
 
 ```powershell
 irm https://raw.githubusercontent.com/therajatshahare/ps1-scripts-win/main/install.ps1 | iex
