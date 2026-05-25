@@ -200,10 +200,28 @@ function Install-IfMissing {
     }
 }
 
+Install-IfMissing "git" "Git.Git"
+Install-IfMissing "scoop" "ScoopInstaller.Scoop"
 Install-IfMissing "yt-dlp" "yt-dlp.yt-dlp"
 Install-IfMissing "ffmpeg" "Gyan.FFmpeg"
 Install-IfMissing "aria2c" "aria2.aria2"
 Install-IfMissing "python" "Python.Python.3"
+
+# Scoop Extras Bucket Initialization
+if (Get-Command scoop -ErrorAction SilentlyContinue) {
+    Write-Host "Configuring Scoop Buckets..." -ForegroundColor Cyan
+    $knownBuckets = scoop bucket list
+    if ($knownBuckets -notlike "*extras*") {
+        try {
+            scoop bucket add extras
+            Write-Host "✔ Added Scoop 'extras' bucket." -ForegroundColor Green
+        } catch {
+            Write-Host "✖ Failed to add Scoop 'extras' bucket." -ForegroundColor Red
+        }
+    } else {
+        Write-Host "Scoop 'extras' bucket already configured."
+    }
+}
 
 # Python packages
 try { python -m pip install --upgrade pip } catch {}
