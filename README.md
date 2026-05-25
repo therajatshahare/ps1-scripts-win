@@ -3,7 +3,7 @@
 A personal **PowerShell CLI toolkit** for everyday automation, media handling, and utilities — install everything with **one command**.
 
 ---
-## Open a PowerShell terminal (version 5.1 or later) and from the PS C:\> prompt, run:
+## 🤖 Open a PowerShell terminal (version 5.1 or later) and from the PS C:\> prompt, run:
 
 ```powershell
 Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
