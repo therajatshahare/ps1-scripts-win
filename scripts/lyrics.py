@@ -51,7 +51,8 @@ final_lyrics = "\n".join(filtered_lines).replace('"', "'").replace("\r", "")
 
 # Temporary files
 lyrics_file = "genius_lyrics.txt"
-temp_file = filepath + ".tmp"
+base, ext = os.path.splitext(filepath)
+temp_file = base + ".tmp.flac"
 
 # Save lyrics
 with open(lyrics_file, "w", encoding="utf-8") as f:
