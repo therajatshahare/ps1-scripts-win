@@ -99,7 +99,9 @@ function Move-InstaloaderMetadata {
 
         $MetadataFiles = Get-ChildItem -Path $ProfileFolder -File |
             Where-Object {
-                $_.Name -like "*.json.xz" -or $_.Name -like "*.txt"
+                $_.Name -like "*.json" -or
+                $_.Name -like "*.json.xz" -or
+                $_.Name -like "*.txt"
             }
 
         if ($MetadataFiles.Count -gt 0) {
