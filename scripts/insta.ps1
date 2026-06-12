@@ -56,7 +56,8 @@ function Protect-InstaloaderData {
                     Write-Host ""
                     Write-Host "EFS backup created on Desktop." -ForegroundColor Green
                     Write-Host "Keep the .pfx file and its password very safe." -ForegroundColor Yellow
-                } else {
+                }
+                else {
                     Write-Host ""
                     Write-Host "EFS backup failed." -ForegroundColor Red
                     Write-Host "Try manually:" -ForegroundColor Yellow
@@ -79,6 +80,38 @@ function Protect-InstaloaderData {
         try {
             cipher /E /A "$BackupMarkerPath" | Out-Null
         } catch {}
+    }
+}
+
+function Move-InstaloaderMetadata {
+    param(
+        [string]$ProfileName
+    )
+
+    $ProfileFolder = Join-Path (Get-Location) $ProfileName
+    $JsonDataFolder = Join-Path $ProfileFolder "json-data"
+
+    if (Test-Path $ProfileFolder) {
+        if (-not (Test-Path $JsonDataFolder)) {
+            New-Item -ItemType Directory -Path $JsonDataFolder -Force | Out-Null
+            Write-Host "Created metadata folder: json-data" -ForegroundColor DarkGray
+        }
+
+        $MetadataFiles = Get-ChildItem -Path $ProfileFolder -File |
+            Where-Object {
+                $_.Name -like "*.json.xz" -or $_.Name -like "*.txt"
+            }
+
+        if ($MetadataFiles.Count -gt 0) {
+            $MetadataFiles | Move-Item -Destination $JsonDataFolder -Force
+            Write-Host "Moved $($MetadataFiles.Count) metadata file(s) to json-data folder." -ForegroundColor Green
+        }
+        else {
+            Write-Host "No .json.xz or .txt files found to move." -ForegroundColor DarkGray
+        }
+    }
+    else {
+        Write-Host "Profile folder not found: $ProfileFolder" -ForegroundColor Yellow
     }
 }
 
@@ -158,15 +191,30 @@ Write-Host "Processing profile: $Username" -ForegroundColor Cyan
 Write-Host "Using login account: $LoginUser" -ForegroundColor Cyan
 Write-Host "Download location: $(Get-Location)" -ForegroundColor DarkGray
 
+$instaOutput = ""
+
 switch ($Mode) {
     "update" {
         Write-Host "Running FAST UPDATE mode..." -ForegroundColor Yellow
-        instaloader --login $LoginUser --fast-update --abort-on=400,401,403,429 $Username
+
+        $instaOutput = instaloader `
+            --login $LoginUser `
+            --fast-update `
+            --abort-on=400,401,403,429 `
+            $Username 2>&1
+
+        $instaOutput | ForEach-Object { Write-Host $_ }
     }
 
     "full" {
         Write-Host "Running FULL DOWNLOAD mode..." -ForegroundColor Yellow
-        instaloader --login $LoginUser --abort-on=400,401,403,429 $Username
+
+        $instaOutput = instaloader `
+            --login $LoginUser `
+            --abort-on=400,401,403,429 `
+            $Username 2>&1
+
+        $instaOutput | ForEach-Object { Write-Host $_ }
     }
 }
 
@@ -179,34 +227,49 @@ try {
 
 if ($instaloaderExitCode -eq 0) {
     Write-Host "Operation completed successfully!" -ForegroundColor Green
-
-    $ProfileFolder = Join-Path (Get-Location) $Username
-    $JsonDataFolder = Join-Path $ProfileFolder "json-data"
-
-    if (Test-Path $ProfileFolder) {
-        if (-not (Test-Path $JsonDataFolder)) {
-            New-Item -ItemType Directory -Path $JsonDataFolder -Force | Out-Null
-            Write-Host "Created metadata folder: json-data" -ForegroundColor DarkGray
-        }
-
-        $MetadataFiles = Get-ChildItem -Path $ProfileFolder -File |
-            Where-Object {
-                $_.Name -like "*.json.xz" -or $_.Name -like "*.txt"
-            }
-
-        if ($MetadataFiles.Count -gt 0) {
-            $MetadataFiles | Move-Item -Destination $JsonDataFolder -Force
-            Write-Host "Moved $($MetadataFiles.Count) metadata file(s) to json-data folder." -ForegroundColor Green
-        }
-        else {
-            Write-Host "No .json.xz or .txt files found to move." -ForegroundColor DarkGray
-        }
-    }
-    else {
-        Write-Host "Profile folder not found: $ProfileFolder" -ForegroundColor Yellow
-    }
+    Move-InstaloaderMetadata -ProfileName $Username
 }
 else {
+    if ($instaOutput -match "graphql/query" `
+        -or $instaOutput -match "400 Bad Request" `
+        -or $instaOutput -match "execution error") {
+
+        Write-Host ""
+        Write-Host "Detected Instagram GraphQL failure." -ForegroundColor Yellow
+        Write-Host "Launching fallback downloader..." -ForegroundColor Cyan
+        Write-Host ""
+
+        $FallbackScript = Join-Path $PSScriptRoot "insta_fallback.py"
+
+        if (-not (Test-Path $FallbackScript)) {
+            Write-Host "Fallback script not found:" -ForegroundColor Red
+            Write-Host $FallbackScript -ForegroundColor Yellow
+            exit 1
+        }
+
+        python $FallbackScript $Username $LoginUser (Get-Location)
+
+        $fallbackExitCode = $LASTEXITCODE
+
+        try {
+            cipher /E "$ConfigDir" | Out-Null
+            cipher /E /A "$ConfigDir\*" | Out-Null
+        } catch {}
+
+        if ($fallbackExitCode -eq 0) {
+            Write-Host ""
+            Write-Host "Fallback operation completed successfully!" -ForegroundColor Green
+            Move-InstaloaderMetadata -ProfileName $Username
+            Write-Host ""
+            exit 0
+        }
+        else {
+            Write-Host ""
+            Write-Host "Fallback downloader also failed." -ForegroundColor Red
+            exit $fallbackExitCode
+        }
+    }
+
     Write-Host "Operation failed. Check credentials, session, or connection." -ForegroundColor Red
     exit 1
 }
