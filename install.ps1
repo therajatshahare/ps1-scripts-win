@@ -259,16 +259,19 @@ if (Get-Command scoop -ErrorAction SilentlyContinue) {
     Write-Host "`nConfiguring Scoop buckets..." -ForegroundColor Cyan
 
     try {
-        $knownBuckets = scoop bucket list
+        $buckets = scoop bucket list | Out-String
 
-        if ($knownBuckets -notlike "*extras*") {
+        if ($buckets -match '(?m)^\s*extras\b') {
+            Write-Host "WARN  The 'extras' bucket already exists. To add this bucket again, first remove it by running 'scoop bucket rm extras'." -ForegroundColor Yellow
+            Write-Host "✔ Skipping Scoop extras bucket." -ForegroundColor Yellow
+        }
+        else {
             scoop bucket add extras
             Write-Host "✔ Added Scoop extras bucket." -ForegroundColor Green
-        } else {
-            Write-Host "Scoop extras bucket already configured."
         }
-    } catch {
-        Write-Host "Could not configure Scoop extras bucket." -ForegroundColor Yellow
+    }
+    catch {
+        Write-Host "✖ Failed to configure Scoop extras bucket." -ForegroundColor Red
     }
 }
 
