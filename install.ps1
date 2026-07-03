@@ -150,7 +150,7 @@ function update-scripts {
 }
 
 function toolkit-help {
-    & "`$scriptDir\toolkit-help.ps1" @args
+    & "$scriptDir\toolkit-help.ps1" @args
 }
 # ===== End ps1-scripts-win Script Setup =====
 "@
@@ -167,7 +167,7 @@ try {
 } catch {}
 
 # Remove old block if exists
-$content = $content -replace '(?s)# ===== ps1-scripts-win Setup =====.*?# ===== End ps1-scripts-win Script Setup =====', ''
+$content = $content -replace '(?s)# ===== ps1-scripts-win Setup =====.*?# ===== End ps1-scripts-win =====', ''
 
 # Write everything cleanly (CRITICAL FIX)
 $newContent = $content.Trim() + "`n`n" + $profileBlock
@@ -176,12 +176,8 @@ Set-Content -Path $profilePath -Value $newContent -Encoding UTF8
 
 Write-Host "Profile updated successfully" -ForegroundColor Green
 
-# Reload profile safely
-try {
-    . $PROFILE
-} catch {
-    Write-Host "Profile updated, but could not be reloaded. Restart PowerShell." -ForegroundColor Yellow
-}
+# Reload profile
+. $PROFILE
 
 # -------------------------------
 # EXECUTION POLICY
