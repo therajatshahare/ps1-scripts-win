@@ -1,7 +1,8 @@
-$toolkitVersion = "1.2.03"
+$toolkitVersion = "1.2.04"
 Write-Host "ps1-scripts-win Version: $toolkitVersion"
+
 # ================================
-# Personal Cmd-Scripts Installer
+# ps1-scripts-win Installer
 # ================================
 
 $ErrorActionPreference = "Stop"
@@ -20,12 +21,25 @@ $branch   = "main"
 
 $baseRaw = "https://raw.githubusercontent.com/$repoUser/$repoName/$branch"
 
-# Target paths
+# Default admin install location
 $targetDir = "C:\Windows\ps1-scripts-win"
-$profileDir = "$HOME\Documents\PowerShell"
-$profilePath = $PROFILE
 
-# Script list
+# If not admin, install in user folder
+$admin = ([Security.Principal.WindowsPrincipal] `
+    [Security.Principal.WindowsIdentity]::GetCurrent()
+).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
+
+if (-not $admin) {
+    Write-Host "⚠ Not running as Administrator. Switching to user directory..." -ForegroundColor Yellow
+    $targetDir = Join-Path $HOME "ps1-scripts-win"
+}
+
+# PowerShell profile path for current PowerShell version
+# Windows PowerShell 5.1 = Documents\WindowsPowerShell
+# PowerShell 7+ = Documents\PowerShell
+$profilePath = $PROFILE
+$profileDir  = Split-Path -Parent $profilePath
+
 $scripts = @(
     "ytvideo.ps1",
     "vytvideo.ps1",
@@ -48,19 +62,7 @@ $scripts = @(
 )
 
 # -------------------------------
-# ADMIN CHECK
-# -------------------------------
-$admin = ([Security.Principal.WindowsPrincipal] `
-    [Security.Principal.WindowsIdentity]::GetCurrent()
-).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
-
-if (-not $admin) {
-    Write-Host "⚠ Not running as Administrator. Switching to user directory..." -ForegroundColor Yellow
-    $targetDir = "$HOME\ps1-scripts-win"
-}
-
-# -------------------------------
-# CREATE DIRECTORY
+# CREATE TARGET DIRECTORY
 # -------------------------------
 if (!(Test-Path $targetDir)) {
     New-Item -ItemType Directory -Path $targetDir -Force | Out-Null
@@ -76,47 +78,62 @@ Write-Host "`nDownloading scripts..." -ForegroundColor Cyan
 
 foreach ($script in $scripts) {
     $url = "$baseRaw/scripts/$script"
-    $out = "$targetDir\$script"
+    $out = Join-Path $targetDir $script
 
     try {
-        Invoke-WebRequest $url -OutFile $out -UseBasicParsing
+        Invoke-WebRequest -Uri $url -OutFile $out -UseBasicParsing
         Write-Host "✔ $script"
     } catch {
         Write-Host "✖ Failed: $script" -ForegroundColor Red
+        Write-Host "  $($_.Exception.Message)" -ForegroundColor DarkGray
     }
 }
 
 # -------------------------------
-# ADD TO PATH
+# ADD TO USER PATH
 # -------------------------------
 $currentPath = [Environment]::GetEnvironmentVariable("PATH", "User")
 
-if ($currentPath -notlike "*$targetDir*") {
-    [Environment]::SetEnvironmentVariable(
-        "PATH",
-        "$currentPath;$targetDir",
-        "User"
-    )
+if ([string]::IsNullOrWhiteSpace($currentPath)) {
+    $currentPath = ""
+}
+
+$pathParts = $currentPath -split ';' | Where-Object { $_ -ne "" }
+
+if ($pathParts -notcontains $targetDir) {
+    $newPath = ($pathParts + $targetDir) -join ';'
+    [Environment]::SetEnvironmentVariable("PATH", $newPath, "User")
     Write-Host "`nAdded to PATH (User)"
 } else {
     Write-Host "`nPATH already configured"
 }
 
+# Update PATH for current session also
+if (($env:PATH -split ';') -notcontains $targetDir) {
+    $env:PATH = "$env:PATH;$targetDir"
+}
+
 # -------------------------------
-# ENSURE PROFILE DIRECTORY
+# ENSURE PROFILE DIRECTORY / FILE
 # -------------------------------
 if (!(Test-Path $profileDir)) {
     New-Item -ItemType Directory -Path $profileDir -Force | Out-Null
 }
 
+if (!(Test-Path $profilePath)) {
+    New-Item -ItemType File -Path $profilePath -Force | Out-Null
+}
+
 # -------------------------------
-# PROFILE SETUP (SMART)
+# PROFILE SETUP
 # -------------------------------
 Write-Host "`nConfiguring PowerShell profile..." -ForegroundColor Cyan
 
 $profileBlock = @"
 # ===== ps1-scripts-win Setup =====
 `$scriptDir = "$targetDir"
+`$toolkitVersion = "$toolkitVersion"
+`$baseRaw = "$baseRaw"
 
 if (!(Test-Path `$scriptDir)) {
     Write-Host "Warning: Script directory not found: `$scriptDir" -ForegroundColor Red
@@ -136,54 +153,70 @@ function unhide { & "`$scriptDir\unhide.ps1" @args }
 function update-tools  { & "`$scriptDir\update.ps1" @args }
 function upgrade-tools { & "`$scriptDir\upgrade.ps1" @args }
 
-function aria     { & "`$scriptDir\aria.ps1" @args }
-function exifpic  { & "`$scriptDir\exifpic.ps1" @args }
-function folders  { & "`$scriptDir\folders.ps1" @args }
-function insta    { & "`$scriptDir\insta.ps1" @args }
+function aria    { & "`$scriptDir\aria.ps1" @args }
+function exifpic { & "`$scriptDir\exifpic.ps1" @args }
+function folders { & "`$scriptDir\folders.ps1" @args }
+function insta   { & "`$scriptDir\insta.ps1" @args }
+function encrypt { & "`$scriptDir\encrypt.ps1" @args }
 
 function toolkit-version {
-    Write-Host "ps1-scripts-win Version: $($toolkitVersion)"
+    Write-Host "ps1-scripts-win Version: `$toolkitVersion"
 }
 
 function update-scripts {
-    irm $baseRaw/install.ps1 | iex
+    irm `$baseRaw/install.ps1 | iex
 }
 
 function toolkit-help {
-    & "$scriptDir\toolkit-help.ps1" @args
+    & "`$scriptDir\toolkit-help.ps1" @args
 }
 # ===== End ps1-scripts-win Script Setup =====
 "@
 
-# Ensure profile file exists
-if (!(Test-Path $profilePath)) {
-    New-Item -ItemType File -Path $profilePath -Force | Out-Null
+# Read profile safely as one string
+try {
+    $content = [System.IO.File]::ReadAllText($profilePath)
+} catch {
+    $content = ""
 }
 
-# Read safely
-$content = ""
-try {
-    $content = Get-Content $profilePath -Raw
-} catch {}
-
-# Remove old block if exists
+# Remove old/broken ps1-scripts-win blocks
+$content = $content -replace '(?s)# ===== ps1-scripts-win Setup =====.*?# ===== End ps1-scripts-win Script Setup =====', ''
 $content = $content -replace '(?s)# ===== ps1-scripts-win Setup =====.*?# ===== End ps1-scripts-win =====', ''
 
-# Write everything cleanly (CRITICAL FIX)
-$newContent = $content.Trim() + "`n`n" + $profileBlock
+# Write clean profile
+if ([string]::IsNullOrWhiteSpace($content)) {
+    $newContent = $profileBlock
+} else {
+    $newContent = $content.Trim() + "`r`n`r`n" + $profileBlock
+}
 
-Set-Content -Path $profilePath -Value $newContent -Encoding UTF8
+[System.IO.File]::WriteAllText(
+    $profilePath,
+    $newContent,
+    [System.Text.UTF8Encoding]::new($false)
+)
 
 Write-Host "Profile updated successfully" -ForegroundColor Green
+Write-Host "Profile path: $profilePath" -ForegroundColor DarkGray
 
-# Reload profile
-. $PROFILE
+# Reload profile safely
+try {
+    . $profilePath
+} catch {
+    Write-Host "Profile updated, but could not be reloaded in this session." -ForegroundColor Yellow
+    Write-Host "Restart PowerShell after setup completes." -ForegroundColor Yellow
+}
 
 # -------------------------------
 # EXECUTION POLICY
 # -------------------------------
-Set-ExecutionPolicy RemoteSigned -Scope CurrentUser -Force
-Write-Host "`nExecution policy set (RemoteSigned)"
+try {
+    Set-ExecutionPolicy RemoteSigned -Scope CurrentUser -Force
+    Write-Host "`nExecution policy set: RemoteSigned"
+} catch {
+    Write-Host "`nCould not set execution policy." -ForegroundColor Yellow
+}
 
 # -------------------------------
 # DEPENDENCIES
@@ -191,11 +224,22 @@ Write-Host "`nExecution policy set (RemoteSigned)"
 Write-Host "`nInstalling dependencies..." -ForegroundColor Cyan
 
 function Install-IfMissing {
-    param($cmd, $wingetName)
+    param(
+        [string]$cmd,
+        [string]$wingetName
+    )
 
     if (!(Get-Command $cmd -ErrorAction SilentlyContinue)) {
-        Write-Host "Installing $cmd..."
-        winget install --id $wingetName -e --silent
+        if (Get-Command winget -ErrorAction SilentlyContinue) {
+            Write-Host "Installing $cmd..."
+            try {
+                winget install --id $wingetName -e --silent --accept-package-agreements --accept-source-agreements
+            } catch {
+                Write-Host "✖ Failed to install $cmd using winget" -ForegroundColor Yellow
+            }
+        } else {
+            Write-Host "winget not found. Please install $cmd manually." -ForegroundColor Yellow
+        }
     } else {
         Write-Host "$cmd already installed"
     }
@@ -208,28 +252,47 @@ Install-IfMissing "ffmpeg" "Gyan.FFmpeg"
 Install-IfMissing "aria2c" "aria2.aria2"
 Install-IfMissing "python" "Python.Python.3"
 
-# Scoop Extras Bucket Initialization
+# -------------------------------
+# SCOOP EXTRAS BUCKET
+# -------------------------------
 if (Get-Command scoop -ErrorAction SilentlyContinue) {
-    Write-Host "Configuring Scoop Buckets..." -ForegroundColor Cyan
-    $knownBuckets = scoop bucket list
-    if ($knownBuckets -notlike "*extras*") {
-        try {
+    Write-Host "`nConfiguring Scoop buckets..." -ForegroundColor Cyan
+
+    try {
+        $knownBuckets = scoop bucket list
+
+        if ($knownBuckets -notlike "*extras*") {
             scoop bucket add extras
-            Write-Host "✔ Added Scoop 'extras' bucket." -ForegroundColor Green
-        } catch {
-            Write-Host "✖ Failed to add Scoop 'extras' bucket." -ForegroundColor Red
+            Write-Host "✔ Added Scoop extras bucket." -ForegroundColor Green
+        } else {
+            Write-Host "Scoop extras bucket already configured."
         }
-    } else {
-        Write-Host "Scoop 'extras' bucket already configured."
+    } catch {
+        Write-Host "Could not configure Scoop extras bucket." -ForegroundColor Yellow
     }
 }
 
-# Python packages
-try { python -m pip install --upgrade pip } catch {}
-try { python -m pip install lyricsgenius } catch {}
+# -------------------------------
+# PYTHON PACKAGES
+# -------------------------------
+if (Get-Command python -ErrorAction SilentlyContinue) {
+    try {
+        python -m pip install --upgrade pip
+    } catch {
+        Write-Host "Could not upgrade pip." -ForegroundColor Yellow
+    }
+
+    try {
+        python -m pip install lyricsgenius
+    } catch {
+        Write-Host "Could not install lyricsgenius." -ForegroundColor Yellow
+    }
+} else {
+    Write-Host "Python not found in current session. Restart PowerShell and check again." -ForegroundColor Yellow
+}
 
 # -------------------------------
 # DONE
 # -------------------------------
 Write-Host "`n=== Setup Complete ===" -ForegroundColor Green
-Write-Host "Restart PowerShell to apply changes."
+Write-Host "Restart PowerShell to apply all changes."
