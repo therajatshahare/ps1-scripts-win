@@ -15,35 +15,41 @@ if (-not $Command) {
     Write-Host "╚══════════════════════════════════════╝" -ForegroundColor Green
     Write-Host "Note: All the scripts will be saved in '$HOME\ps1-scripts-win'." -ForegroundColor Cyan
 
-    Write-Host "`n🎥 Media Commands" -ForegroundColor Yellow
-    Write-Host "  ytvideo    → Download YouTube video"
-    Write-Host "  vytvideo   → Download vertical video"
-    Write-Host "  ytaudio    → Extract audio"
+    # Using a Here-String ensures PowerShell treats all symbols and spaces purely as plain text
+    $HelpMenu = @'
 
-    Write-Host "`n🎵 Metadata & Lyrics" -ForegroundColor Yellow
-    Write-Host "  showmeta     → Show metadata"
-    Write-Host "  showformat   → Show formats"
-    Write-Host "  showlyrics   → Fetch lyrics"
+🎥 Media Commands
+  ytvideo    → Download YouTube video
+  vytvideo   → Download vertical video
+  ytaudio    → Extract audio
 
-    Write-Host "`n📁 File Utilities" -ForegroundColor Yellow
-    Write-Host "  folders    → List folders"
-    Write-Host "  hide       → Hide file"
-    Write-Host "  unhide     → Unhide file"
-    Write-Host "  exifpic    → Modify EXIF data"
+🎵 Metadata & Lyrics
+  showmeta     → Show metadata
+  showformat   → Show formats
+  showlyrics   → Fetch lyrics
 
-    Write-Host "`n⚡ System Tools" -ForegroundColor Yellow
-    Write-Host "  update     → Update tools"
-    Write-Host "  upgrade    → Upgrade system"
-    Write-Host "  aria       → Downloader"
+📁 File Utilities
+  folders    → List folders
+  hide       → Hide file
+  unhide     → Unhide file
+  exifpic    → Modify EXIF data
 
-    Write-Host "`n📸 Instagram" -ForegroundColor Yellow
-    Write-Host "  insta      → Profile downloader"
+⚡ System Tools
+  update     → Update tools
+  upgrade    → Upgrade system
+  aria       → Downloader
 
-    Write-Host "`n🔁 Toolkit" -ForegroundColor Yellow
-    Write-Host "  update-scripts   → Update toolkit"
-    Write-Host "  toolkit-version  → Show version"
+📸 Instagram
+  insta      → Profile downloader
 
-    Write-Host "`nTip: Run 'toolkit-help [command]' for detailed usage" -ForegroundColor DarkGray
+🔁 Toolkit
+  update-scripts   → Update toolkit
+  toolkit-version  → Show version
+
+Tip: Run 'toolkit-help [command]' for detailed usage
+'@
+
+    Write-Host $HelpMenu -ForegroundColor Gray
     Write-Host ""
     return
 }
@@ -110,7 +116,7 @@ switch ($Command.ToLower()) {
     }
 
     "insta" {
-        Write-Host "insta [user] [full|update] [account|ask]" -ForegroundColor Cyan
+        Write-Host 'insta [user] [full|update] [account|ask]' -ForegroundColor Cyan
         Write-Host "Download Instagram profile posts using Instaloader"
         Write-Host ""
         Write-Host "Examples:"
