@@ -92,7 +92,7 @@ foreach ($script in $scripts) {
 # -------------------------------
 # ADD TO USER PATH
 # -------------------------------
-$currentPath = [Environment]::GetEnvironmentVariable("PATH", "User")
+$currentPath = [Environment]::GetEnvironmentVariable("Path", "User")
 
 if ([string]::IsNullOrWhiteSpace($currentPath)) {
     $currentPath = ""
@@ -102,7 +102,7 @@ $pathParts = $currentPath -split ';' | Where-Object { $_ -ne "" }
 
 if ($pathParts -notcontains $targetDir) {
     $newPath = ($pathParts + $targetDir) -join ';'
-    [Environment]::SetEnvironmentVariable("PATH", $newPath, "User")
+    [Environment]::SetEnvironmentVariable("Path", $newPath, "User")
     Write-Host "`nAdded to PATH (User)"
 } else {
     Write-Host "`nPATH already configured"
