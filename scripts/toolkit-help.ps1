@@ -43,7 +43,7 @@ if (-not $Command) {
     Write-Host "  update-scripts   → Update toolkit"
     Write-Host "  toolkit-version  → Show version"
 
-    Write-Host "`nTip: Run 'toolkit-help <command>' for detailed usage" -ForegroundColor DarkGray
+    Write-Host "`nTip: Run 'toolkit-help [command]' for detailed usage" -ForegroundColor DarkGray
     Write-Host ""
     return
 }
@@ -54,11 +54,11 @@ if (-not $Command) {
 switch ($Command.ToLower()) {
 
     "ytvideo" {
-        Write-Host "ytvideo [res] `"name`" `"url`"" -ForegroundColor Cyan
+        Write-Host 'ytvideo [res] "name" "url"' -ForegroundColor Cyan
         Write-Host "Download YouTube video (≤4K)"
         Write-Host ""
         Write-Host "Example:"
-        Write-Host "  ytvideo 2k `"video`" `"https://youtu.be/...`""
+        Write-Host '  ytvideo 2k "video" "https://youtu.be/..."'
         Write-Host ""
         Write-Host "Resolutions:"
         Write-Host "  4k, 2k, 1080p, 720p, 480p, 360p, 240p"
@@ -69,11 +69,11 @@ switch ($Command.ToLower()) {
     }
 
     "vytvideo" {
-        Write-Host "vytvideo [res] `"name`" `"url`"" -ForegroundColor Cyan
+        Write-Host 'vytvideo [res] "name" "url"' -ForegroundColor Cyan
         Write-Host "Download vertical videos (Reels/Shorts)"
         Write-Host ""
         Write-Host "Example:"
-        Write-Host "  vytvideo 2k `"video`" `"https://youtu.be/...`""
+        Write-Host '  vytvideo 2k "video" "https://youtu.be/..."'
         Write-Host ""
         Write-Host "Notes:"
         Write-Host "  • Uses same resolution options as ytvideo"
@@ -81,12 +81,12 @@ switch ($Command.ToLower()) {
     }
 
     "ytaudio" {
-        Write-Host "ytaudio `"name`" `"url`"" -ForegroundColor Cyan
+        Write-Host 'ytaudio "name" "url"' -ForegroundColor Cyan
         Write-Host "Extract audio in FLAC format"
         Write-Host ""
         Write-Host "Examples:"
-        Write-Host "  ytaudio `"song`" `"https://youtu.be/...`""
-        Write-Host "  ytaudio `"https://youtu.be/...`""
+        Write-Host '  ytaudio "song" "https://youtu.be/..."'
+        Write-Host '  ytaudio "https://youtu.be/..."'
         Write-Host ""
         Write-Host "Notes:"
         Write-Host "  • Best quality audio (FLAC)"
@@ -94,14 +94,14 @@ switch ($Command.ToLower()) {
     }
 
     "exifpic" {
-        Write-Host "exifpic `"YYYY:MM:DD HH:MM`" [file]" -ForegroundColor Cyan
+        Write-Host 'exifpic "YYYY:MM:DD HH:MM" [file]' -ForegroundColor Cyan
         Write-Host "Modify EXIF date/time"
         Write-Host ""
         Write-Host "Examples:"
-        Write-Host "  exifpic `"2024:01:01 10:00`""
+        Write-Host '  exifpic "2024:01:01 10:00"'
         Write-Host "    → Apply to all JPG/PNG in current folder"
         Write-Host ""
-        Write-Host "  exifpic `"2024:01:01 10:00`" `"image.jpg`""
+        Write-Host '  exifpic "2024:01:01 10:00" "image.jpg"'
         Write-Host "    → Apply to specific file"
         Write-Host ""
         Write-Host "Notes:"
@@ -110,7 +110,7 @@ switch ($Command.ToLower()) {
     }
 
     "insta" {
-        Write-Host "insta <user> [full|update] [account|ask]" -ForegroundColor Cyan
+        Write-Host "insta [user] [full|update] [account|ask]" -ForegroundColor Cyan
         Write-Host "Download Instagram profile posts using Instaloader"
         Write-Host ""
         Write-Host "Examples:"
@@ -143,10 +143,10 @@ switch ($Command.ToLower()) {
         Write-Host "  • Next time, the same slot automatically uses that username"
         Write-Host ""
         Write-Host "Account config file:"
-        Write-Host "  `$env:LOCALAPPDATA\Instaloader\insta-accounts.json"
+        Write-Host '  $env:LOCALAPPDATA\Instaloader\insta-accounts.json'
         Write-Host ""
         Write-Host "View/edit account slots:"
-        Write-Host "  notepad `"`$env:LOCALAPPDATA\Instaloader\insta-accounts.json`""
+        Write-Host '  notepad "$env:LOCALAPPDATA\Instaloader\insta-accounts.json"'
         Write-Host ""
         Write-Host "Metadata cleanup:"
         Write-Host "  • .json.xz and .txt files are moved to profile\json-data"
@@ -158,51 +158,45 @@ switch ($Command.ToLower()) {
     }
     
     "showmeta" {
-        Write-Host "showmeta `"file`"" -ForegroundColor Cyan
+        Write-Host 'showmeta "file"' -ForegroundColor Cyan
         Write-Host "Display full media metadata using MediaInfo/FFprobe"
         Write-Host ""
-        Write-Host "Example:"
-        Write-Host "  showmeta `"video.mkv`""
+        Write-Host '  Example: showmeta "video.mkv"'
     }
 
     "showformat" {
-        Write-Host "showformat `"url`"" -ForegroundColor Cyan
+        Write-Host 'showformat "url"' -ForegroundColor Cyan
         Write-Host "Display format and stream details (YouTube/online sources)"
         Write-Host ""
-        Write-Host "Examples:"
-        Write-Host "  showformat `"https://youtu.be/...`""
+        Write-Host '  Example: showformat "https://youtu.be/..."'
         Write-Host "  Only supports URLs (Not the local files)"
         Write-Host "  For local files use showmeta"
     }
 
     "showlyrics" {
-        Write-Host "showlyrics `"file`"" -ForegroundColor Cyan
+        Write-Host 'showlyrics "file"' -ForegroundColor Cyan
         Write-Host "Fetch and embed lyrics into audio file"
         Write-Host ""
-        Write-Host "Example:"
-        Write-Host "  showlyrics `"song.flac`""
+        Write-Host '  Example: showlyrics "song.flac"'
     }
 
-    # =========================================================
-    # ADDED: Missing File, System, and Toolkit Commands
-    # =========================================================
     "folders" {
         Write-Host "folders" -ForegroundColor Cyan
         Write-Host "Lists all directories in the current path in a clean, visual structure."
     }
 
     "hide" {
-        Write-Host "hide `"file_or_folder`"" -ForegroundColor Cyan
+        Write-Host 'hide "file_or_folder"' -ForegroundColor Cyan
         Write-Host "Hides a specified file or folder from typical directory views."
     }
 
     "unhide" {
-        Write-Host "unhide `"file_or_folder`"" -ForegroundColor Cyan
+        Write-Host 'unhide "file_or_folder"' -ForegroundColor Cyan
         Write-Host "Reveals a previously hidden file or folder."
     }
 
     "aria" {
-        Write-Host "aria `"url`" [options]" -ForegroundColor Cyan
+        Write-Host 'aria "url" [options]' -ForegroundColor Cyan
         Write-Host "High-speed downloader utility using aria2c."
     }
 
