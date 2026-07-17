@@ -13,7 +13,7 @@ if (-not $Command) {
     Write-Host "╔══════════════════════════════════════╗" -ForegroundColor Green
     Write-Host "║      🚀 ps1-scripts-win Help        ║" -ForegroundColor Green
     Write-Host "╚══════════════════════════════════════╝" -ForegroundColor Green
-    Write-Host "Note: All the scripts will be saved on your "$HOME\ps1-scripts-win" directory." -ForegroundColor Cyan
+    Write-Host "Note: All the scripts will be saved in '$HOME\ps1-scripts-win'." -ForegroundColor Cyan
 
     Write-Host "`n🎥 Media Commands" -ForegroundColor Yellow
     Write-Host "  ytvideo    → Download YouTube video"
