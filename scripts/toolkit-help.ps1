@@ -10,38 +10,38 @@ Write-Host ""
 if (-not $Command) {
 
     Write-Host "" -ForegroundColor Cyan
-    Write-Host "╔══════════════════════════════════════╗" -ForegroundColor Green
-    Write-Host "║      🚀 ps1-scripts-win Help         ║" -ForegroundColor Green
-    Write-Host "╚══════════════════════════════════════╝" -ForegroundColor Green
+    Write-Host "+--------------------------------------+" -ForegroundColor Green
+    Write-Host "|         ps1-scripts-win Help         |" -ForegroundColor Green
+    Write-Host "+--------------------------------------+" -ForegroundColor Green
     Write-Host "Note: All scripts are saved in your home folder under ps1-scripts-win." -ForegroundColor Cyan
 
-    Write-Host "`n🎥 Media Commands" -ForegroundColor Yellow
-    Write-Host "  ytvideo    → Download YouTube video"
-    Write-Host "  vytvideo   → Download vertical video"
-    Write-Host "  ytaudio    → Extract audio"
+    Write-Host "`nMedia Commands" -ForegroundColor Yellow
+    Write-Host "  ytvideo    - Download YouTube video"
+    Write-Host "  vytvideo   - Download vertical video"
+    Write-Host "  ytaudio    - Extract audio"
 
-    Write-Host "`n🎵 Metadata & Lyrics" -ForegroundColor Yellow
-    Write-Host "  showmeta     → Show metadata"
-    Write-Host "  showformat   → Show formats"
-    Write-Host "  showlyrics   → Fetch lyrics"
+    Write-Host "`nMetadata and Lyrics" -ForegroundColor Yellow
+    Write-Host "  showmeta     - Show metadata"
+    Write-Host "  showformat   - Show formats"
+    Write-Host "  showlyrics   - Fetch lyrics"
 
-    Write-Host "`n📁 File Utilities" -ForegroundColor Yellow
-    Write-Host "  folders    → List folders"
-    Write-Host "  hide       → Hide file"
-    Write-Host "  unhide     → Unhide file"
-    Write-Host "  exifpic    → Modify EXIF data"
+    Write-Host "`nFile Utilities" -ForegroundColor Yellow
+    Write-Host "  folders    - List folders"
+    Write-Host "  hide       - Hide file"
+    Write-Host "  unhide     - Unhide file"
+    Write-Host "  exifpic    - Modify EXIF data"
 
-    Write-Host "`n⚡ System Tools" -ForegroundColor Yellow
-    Write-Host "  update     → Update tools"
-    Write-Host "  upgrade    → Upgrade system"
-    Write-Host "  aria       → Downloader"
+    Write-Host "`nSystem Tools" -ForegroundColor Yellow
+    Write-Host "  update     - Update tools"
+    Write-Host "  upgrade    - Upgrade system"
+    Write-Host "  aria       - Downloader"
 
-    Write-Host "`n📸 Instagram" -ForegroundColor Yellow
-    Write-Host "  insta      → Profile downloader"
+    Write-Host "`nInstagram" -ForegroundColor Yellow
+    Write-Host "  insta      - Profile downloader"
 
-    Write-Host "`n🔁 Toolkit" -ForegroundColor Yellow
-    Write-Host "  update-scripts   → Update toolkit"
-    Write-Host "  toolkit-version  → Show version"
+    Write-Host "`nToolkit" -ForegroundColor Yellow
+    Write-Host "  update-scripts   - Update toolkit"
+    Write-Host "  toolkit-version  - Show version"
 
     Write-Host "`nTip: Run toolkit-help followed by a command name for detailed usage." -ForegroundColor DarkGray
     Write-Host ""
