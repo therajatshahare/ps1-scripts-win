@@ -201,6 +201,21 @@ if ($selectedDeps.Count -gt 0) {
 
     foreach ($dep in $selectedDeps) {
         if (Get-Command $dep.Cmd -ErrorAction SilentlyContinue) {
+
+            if ($dep.Cmd -eq "scoop") {
+                # Scoop manages itself entirely (its own folder + PATH entries).
+                # winget's "ScoopInstaller.Scoop" package has no real uninstall
+                # action wired up, so it must be removed via Scoop's own command.
+                try {
+                    "y" | scoop uninstall scoop -p
+                    Write-Host "[OK] Uninstalled Scoop" -ForegroundColor Green
+                } catch {
+                    Write-Host "[FAIL] 'scoop uninstall scoop -p' failed. Remove manually:" -ForegroundColor Yellow
+                    Write-Host "  Remove-Item -Recurse -Force `"`$env:USERPROFILE\scoop`"" -ForegroundColor DarkGray
+                }
+                continue
+            }
+
             if ($wingetAvailable) {
                 try {
                     winget uninstall --id $dep.Winget -e --silent
