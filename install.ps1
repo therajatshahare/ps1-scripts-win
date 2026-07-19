@@ -152,8 +152,11 @@ try {
 
     Set-PSReadLineKeyHandler -Key Tab -Function MenuComplete
 
-} catch {
+}
+
+catch {
     Write-Host "PSReadLine could not be loaded." -ForegroundColor Yellow
+    Write-Host $_.Exception.Message -ForegroundColor Red
 }
 
 if (!(Test-Path `$scriptDir)) {
