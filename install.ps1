@@ -1,4 +1,4 @@
-$toolkitVersion = "1.2.04"
+$toolkitVersion = "1.2.05"
 Write-Host "ps1-scripts-win Version: $toolkitVersion"
 
 # ================================
@@ -135,6 +135,27 @@ $profileBlock = @"
 `$toolkitVersion = "$toolkitVersion"
 `$baseRaw = "$baseRaw"
 
+# -------------------------------
+# PowerShell Enhancements
+# -------------------------------
+
+try {
+    Import-Module PSReadLine -ErrorAction Stop
+
+    # Optional: Load smarter command predictions
+    Import-Module CompletionPredictor -ErrorAction SilentlyContinue
+
+    Set-PSReadLineOption -MaximumHistoryCount 10000
+    Set-PSReadLineOption -PredictionSource HistoryAndPlugin
+    Set-PSReadLineOption -PredictionViewStyle ListView
+    Set-PSReadLineOption -BellStyle None
+
+    Set-PSReadLineKeyHandler -Key Tab -Function MenuComplete
+
+} catch {
+    Write-Host "PSReadLine could not be loaded." -ForegroundColor Yellow
+}
+
 if (!(Test-Path `$scriptDir)) {
     Write-Host "Warning: Script directory not found: `$scriptDir" -ForegroundColor Red
 }
@@ -251,6 +272,42 @@ Install-IfMissing "yt-dlp" "yt-dlp.yt-dlp"
 Install-IfMissing "ffmpeg" "Gyan.FFmpeg"
 Install-IfMissing "aria2c" "aria2.aria2"
 Install-IfMissing "python" "Python.Python.3"
+
+# -------------------------------
+# POWERSHELL MODULES
+# -------------------------------
+Write-Host "`nInstalling PowerShell modules..." -ForegroundColor Cyan
+
+function Install-PSModuleIfMissing {
+    param(
+        [string]$ModuleName
+    )
+
+    $module = Get-Module -ListAvailable -Name $ModuleName
+
+    if (-not $module) {
+        Write-Host "Installing $ModuleName..."
+
+        try {
+            Install-Module $ModuleName `
+                -Scope CurrentUser `
+                -Repository PSGallery `
+                -Force `
+                -AllowClobber
+
+            Write-Host "✔ Installed $ModuleName" -ForegroundColor Green
+        }
+        catch {
+            Write-Host "✖ Failed to install $ModuleName" -ForegroundColor Yellow
+        }
+    }
+    else {
+        Write-Host "$ModuleName already installed"
+    }
+}
+
+Install-PSModuleIfMissing "PSReadLine"
+Install-PSModuleIfMissing "CompletionPredictor"
 
 # -------------------------------
 # SCOOP EXTRAS BUCKET
