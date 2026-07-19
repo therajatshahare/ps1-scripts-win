@@ -206,23 +206,40 @@ if ($selectedDeps.Count -gt 0) {
                 # Scoop manages itself entirely (its own folder + PATH entries).
                 # winget's "ScoopInstaller.Scoop" package has no real uninstall
                 # action wired up, so it must be removed via Scoop's own command.
-                try {
-                    "y" | scoop uninstall scoop -p
+                "y" | scoop uninstall scoop -p 2>&1 | Out-Null
+
+                $scoopDir = Join-Path $HOME "scoop"
+                if (Test-Path $scoopDir) {
+                    # Scoop's own uninstaller can leave junction targets behind
+                    # (Remove-Item recurses into NTFS junctions instead of just
+                    # unlinking them). cmd's rd /s /q handles junctions correctly.
+                    cmd /c rd /s /q "`"$scoopDir`"" 2>&1 | Out-Null
+                }
+
+                if (Test-Path $scoopDir) {
+                    Write-Host "[FAIL] Scoop folder still present: $scoopDir" -ForegroundColor Yellow
+                    Write-Host "  Close any apps installed via Scoop (they may be locking files), then run:" -ForegroundColor DarkGray
+                    Write-Host "  cmd /c rd /s /q `"$scoopDir`"" -ForegroundColor DarkGray
+                } else {
                     Write-Host "[OK] Uninstalled Scoop" -ForegroundColor Green
-                } catch {
-                    Write-Host "[FAIL] 'scoop uninstall scoop -p' failed. Remove manually:" -ForegroundColor Yellow
-                    Write-Host "  Remove-Item -Recurse -Force `"`$env:USERPROFILE\scoop`"" -ForegroundColor DarkGray
                 }
                 continue
             }
 
             if ($wingetAvailable) {
-                try {
-                    winget uninstall --id $dep.Winget -e --silent
+                winget uninstall --id $dep.Winget -e --silent | Out-Null
+                $wingetOk = ($LASTEXITCODE -eq 0)
+
+                # Confirm it's actually gone rather than trusting winget's exit code alone
+                Start-Sleep -Milliseconds 300
+                $stillPresent = [bool](Get-Command $dep.Cmd -ErrorAction SilentlyContinue)
+
+                if ($wingetOk -and -not $stillPresent) {
                     Write-Host "[OK] Uninstalled $($dep.Name)" -ForegroundColor Green
                     if ($dep.Cmd -eq "python") { $removedPython = $true }
-                } catch {
-                    Write-Host "[FAIL] Failed to uninstall $($dep.Name)" -ForegroundColor Yellow
+                } else {
+                    Write-Host "[FAIL] $($dep.Name) was not removed (still on PATH or winget reported an error)." -ForegroundColor Yellow
+                    Write-Host "  Find its exact package ID with 'winget list' and retry, or remove it from Settings > Apps." -ForegroundColor DarkGray
                 }
             } else {
                 Write-Host "winget not found. Please remove $($dep.Name) manually." -ForegroundColor Yellow
