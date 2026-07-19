@@ -156,7 +156,7 @@ try {
 
 catch {
     Write-Host "PSReadLine could not be loaded." -ForegroundColor Yellow
-    Write-Host $_.Exception.Message -ForegroundColor Red
+    $_ | Format-List * -Force
 }
 
 if (!(Test-Path `$scriptDir)) {
