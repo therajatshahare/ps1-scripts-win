@@ -13,8 +13,8 @@ if (-not $Command) {
     Write-Host "╔══════════════════════════════════════╗" -ForegroundColor Green
     Write-Host "║      🚀 ps1-scripts-win Help                ║" -ForegroundColor Green
     Write-Host "╚══════════════════════════════════════╝" -ForegroundColor Green
-    Write-Host "Note: All the scripts will be saved on your "$HOME\ps1-scripts-win" directory." -ForegroundColor Cyan
-
+    Write-Host "Note: All the scripts will be saved in $HOME\ps1-scripts-win." -ForegroundColor Cyan
+    
     Write-Host "`n🎥 Media Commands" -ForegroundColor Yellow
     Write-Host "  ytvideo    → Download YouTube video"
     Write-Host "  vytvideo   → Download vertical video"
@@ -43,7 +43,7 @@ if (-not $Command) {
     Write-Host "  update-scripts   → Update toolkit"
     Write-Host "  toolkit-version  → Show version"
 
-    Write-Host "`nTip: Run 'toolkit-help <command>' for detailed usage" -ForegroundColor DarkGray
+    Write-Host "`nTip: Run 'toolkit-help [command]' for detailed usage" -ForegroundColor DarkGray
     Write-Host ""
     return
 }
@@ -110,7 +110,7 @@ switch ($Command.ToLower()) {
     }
 
     "insta" {
-        Write-Host "insta <user> [full|update] [account|ask]" -ForegroundColor Cyan
+        Write-Host "insta [user] [full|update] [account|ask]" -ForegroundColor Cyan
         Write-Host "Download Instagram profile posts using Instaloader"
         Write-Host ""
         Write-Host "Examples:"
@@ -185,7 +185,7 @@ switch ($Command.ToLower()) {
 
     default {
         Write-Host "Unknown command: $Command" -ForegroundColor Red
-        Write-Host "Use 'toolkit-help' to see available commands"
+        Write-Host "Run 'toolkit-help' to see all available commands." -ForegroundColor Yellow
     }
 }
 
