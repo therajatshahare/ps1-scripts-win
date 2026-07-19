@@ -167,6 +167,11 @@ ps1-scripts-win/
 * Works best without Administrator mode
 
 ---
+## 🚀 For Uninstallation Run
+
+```powershell
+irm https://raw.githubusercontent.com/therajatshahare/ps1-scripts-win/main/uninstall.ps1 | iex
+```
 
 ## ⭐ Author
 
