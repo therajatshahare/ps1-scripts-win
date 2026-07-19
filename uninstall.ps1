@@ -15,17 +15,21 @@
 .USAGE
     irm https://raw.githubusercontent.com/therajatshahare/ps1-scripts-win/main/uninstall.ps1 | iex
 
-    To also remove winget dependencies:
-    $script:RemoveDeps = $true
+    You'll be prompted interactively for which dependencies (if any) to
+    also remove (git, python, ffmpeg, yt-dlp, aria2, scoop, PowerShell 7).
+
+    To skip the prompt entirely (non-interactive/CI use):
+    $script:RemoveDeps = $false   # keep all dependencies
+    $script:RemoveDeps = $true    # remove all dependencies
     irm https://raw.githubusercontent.com/therajatshahare/ps1-scripts-win/main/uninstall.ps1 | iex
 #>
 
 $ErrorActionPreference = "Continue"
 
-Write-Host "╔══════════════════════════════════════╗" -ForegroundColor Red
-Write-Host "║            ps1-scripts-win           ║" -ForegroundColor Red
-Write-Host "║           Uninstall Starting          ║" -ForegroundColor Red
-Write-Host "╚══════════════════════════════════════╝" -ForegroundColor Red
+Write-Host "========================================" -ForegroundColor Red
+Write-Host "           ps1-scripts-win          " -ForegroundColor Red
+Write-Host "          Uninstall Starting          " -ForegroundColor Red
+Write-Host "========================================" -ForegroundColor Red
 
 # -------------------------------
 # CONFIG
@@ -38,11 +42,21 @@ $profilePaths = @(
     "$HOME\Documents\PowerShell\Microsoft.PowerShell_profile.ps1"
 )
 
-# Allow the caller to opt in to removing shared dependencies:
-#   $script:RemoveDeps = $true; irm ... | iex
-if (-not (Test-Path variable:script:RemoveDeps)) {
-    $script:RemoveDeps = $false
-}
+# Dependency list: command to check for, winget package id, display name
+$depTable = @(
+    @{ Cmd = "git";    Winget = "Git.Git";           Name = "Git" }
+    @{ Cmd = "python"; Winget = "Python.Python.3";   Name = "Python" }
+    @{ Cmd = "ffmpeg"; Winget = "Gyan.FFmpeg";       Name = "FFmpeg" }
+    @{ Cmd = "yt-dlp"; Winget = "yt-dlp.yt-dlp";     Name = "yt-dlp" }
+    @{ Cmd = "aria2c"; Winget = "aria2.aria2";       Name = "aria2" }
+    @{ Cmd = "scoop";  Winget = "ScoopInstaller.Scoop"; Name = "Scoop" }
+    @{ Cmd = "pwsh";   Winget = "Microsoft.PowerShell";  Name = "PowerShell 7" }
+)
+
+# $script:RemoveDeps can be pre-set to $true/$false to skip the prompt
+# (useful for automation). Otherwise we ask interactively below.
+$skipPrompt = Test-Path variable:script:RemoveDeps
+$selectedDeps = @()
 
 # -------------------------------
 # 1. REMOVE INSTALL DIRECTORY
@@ -53,9 +67,9 @@ foreach ($dir in @($adminDir, $userDir)) {
     if (Test-Path $dir) {
         try {
             Remove-Item -Path $dir -Recurse -Force
-            Write-Host "✔ Removed: $dir" -ForegroundColor Green
+            Write-Host "[OK] Removed: $dir" -ForegroundColor Green
         } catch {
-            Write-Host "✖ Failed to remove $dir (try running as Administrator)" -ForegroundColor Red
+            Write-Host "[FAIL] Failed to remove $dir (try running as Administrator)" -ForegroundColor Red
             Write-Host "  $($_.Exception.Message)" -ForegroundColor DarkGray
         }
     }
@@ -75,7 +89,7 @@ if (-not [string]::IsNullOrWhiteSpace($currentPath)) {
 
     if ($newPath -ne $currentPath) {
         [Environment]::SetEnvironmentVariable("Path", $newPath, "User")
-        Write-Host "✔ Removed toolkit dir(s) from User PATH" -ForegroundColor Green
+        Write-Host "[OK] Removed toolkit dir(s) from User PATH" -ForegroundColor Green
     } else {
         Write-Host "PATH did not contain toolkit dir(s)"
     }
@@ -114,7 +128,7 @@ foreach ($profilePath in $profilePaths) {
             $content.Trim(),
             [System.Text.UTF8Encoding]::new($false)
         )
-        Write-Host "✔ Cleaned profile: $profilePath" -ForegroundColor Green
+        Write-Host "[OK] Cleaned profile: $profilePath" -ForegroundColor Green
     } else {
         Write-Host "No toolkit block found in: $profilePath"
     }
@@ -132,9 +146,9 @@ function Uninstall-PSModuleIfPresent {
     if ($module) {
         try {
             Uninstall-Module $ModuleName -AllVersions -Force -ErrorAction Stop
-            Write-Host "✔ Removed module: $ModuleName" -ForegroundColor Green
+            Write-Host "[OK] Removed module: $ModuleName" -ForegroundColor Green
         } catch {
-            Write-Host "✖ Could not remove module $ModuleName (may be a built-in/system copy)" -ForegroundColor Yellow
+            Write-Host "[FAIL] Could not remove module $ModuleName (may be a built-in/system copy)" -ForegroundColor Yellow
         }
     } else {
         Write-Host "$ModuleName not installed"
@@ -149,50 +163,71 @@ Write-Host "Leaving PSReadLine in place (it's a built-in PowerShell component)"
 # -------------------------------
 # 5. OPTIONAL: WINGET DEPENDENCIES
 # -------------------------------
-if ($script:RemoveDeps) {
-    Write-Host "`nRemoveDeps enabled - uninstalling winget dependencies..." -ForegroundColor Cyan
+Write-Host "`nDependencies" -ForegroundColor Cyan
+Write-Host "The installer also set these up if they were missing on your system." -ForegroundColor DarkGray
+Write-Host "Other software on your PC may rely on them, so choose carefully." -ForegroundColor DarkGray
 
-    function Uninstall-IfPresent {
-        param([string]$cmd, [string]$wingetName)
+if ($skipPrompt) {
+    # Non-interactive: $script:RemoveDeps was pre-set by the caller
+    if ($script:RemoveDeps) {
+        $selectedDeps = $depTable
+        Write-Host "RemoveDeps=`$true - removing all listed dependencies without prompting." -ForegroundColor Yellow
+    } else {
+        Write-Host "RemoveDeps=`$false - keeping all dependencies." -ForegroundColor DarkGray
+    }
+} else {
+    Write-Host ""
+    for ($i = 0; $i -lt $depTable.Count; $i++) {
+        $installed = if (Get-Command $depTable[$i].Cmd -ErrorAction SilentlyContinue) { "installed" } else { "not installed" }
+        Write-Host ("  [{0}] {1} ({2})" -f ($i + 1), $depTable[$i].Name, $installed)
+    }
+    Write-Host ""
+    Write-Host "Enter numbers to remove (e.g. 1,3,5), 'all', or press Enter to keep everything:" -ForegroundColor Cyan
+    $answer = Read-Host ">"
 
-        if (Get-Command $cmd -ErrorAction SilentlyContinue) {
-            if (Get-Command winget -ErrorAction SilentlyContinue) {
+    if ($answer -match '^\s*all\s*$') {
+        $selectedDeps = $depTable
+    } elseif (-not [string]::IsNullOrWhiteSpace($answer)) {
+        $indexes = $answer -split ',' | ForEach-Object { $_.Trim() } | Where-Object { $_ -match '^\d+$' } | ForEach-Object { [int]$_ - 1 }
+        $selectedDeps = $indexes | Where-Object { $_ -ge 0 -and $_ -lt $depTable.Count } | ForEach-Object { $depTable[$_] }
+    }
+}
+
+if ($selectedDeps.Count -gt 0) {
+    Write-Host "`nRemoving selected dependencies..." -ForegroundColor Cyan
+
+    $wingetAvailable = [bool](Get-Command winget -ErrorAction SilentlyContinue)
+    $removedPython = $false
+
+    foreach ($dep in $selectedDeps) {
+        if (Get-Command $dep.Cmd -ErrorAction SilentlyContinue) {
+            if ($wingetAvailable) {
                 try {
-                    winget uninstall --id $wingetName -e --silent
-                    Write-Host "✔ Uninstalled $cmd" -ForegroundColor Green
+                    winget uninstall --id $dep.Winget -e --silent
+                    Write-Host "[OK] Uninstalled $($dep.Name)" -ForegroundColor Green
+                    if ($dep.Cmd -eq "python") { $removedPython = $true }
                 } catch {
-                    Write-Host "✖ Failed to uninstall $cmd" -ForegroundColor Yellow
+                    Write-Host "[FAIL] Failed to uninstall $($dep.Name)" -ForegroundColor Yellow
                 }
             } else {
-                Write-Host "winget not found. Please remove $cmd manually." -ForegroundColor Yellow
+                Write-Host "winget not found. Please remove $($dep.Name) manually." -ForegroundColor Yellow
             }
         } else {
-            Write-Host "$cmd not installed"
+            Write-Host "$($dep.Name) not installed"
         }
     }
 
-    Uninstall-IfPresent "yt-dlp" "yt-dlp.yt-dlp"
-    Uninstall-IfPresent "ffmpeg" "Gyan.FFmpeg"
-    Uninstall-IfPresent "aria2c" "aria2.aria2"
-    Uninstall-IfPresent "pwsh" "Microsoft.PowerShell"
-    Uninstall-IfPresent "scoop" "ScoopInstaller.Scoop"
-    Uninstall-IfPresent "python" "Python.Python.3"
-    Uninstall-IfPresent "git" "Git.Git"
-
-    # lyricsgenius pip package
-    if (Get-Command python -ErrorAction SilentlyContinue) {
+    # lyricsgenius pip package (only relevant if python is still around)
+    if (-not $removedPython -and (Get-Command python -ErrorAction SilentlyContinue)) {
         try {
             python -m pip uninstall -y lyricsgenius
-            Write-Host "✔ Removed lyricsgenius (pip)" -ForegroundColor Green
+            Write-Host "[OK] Removed lyricsgenius (pip)" -ForegroundColor Green
         } catch {
             Write-Host "Could not remove lyricsgenius via pip." -ForegroundColor Yellow
         }
     }
 } else {
-    Write-Host "`nSkipping winget dependencies (git, python, ffmpeg, yt-dlp, aria2, scoop, pwsh)." -ForegroundColor DarkGray
-    Write-Host "These are general-purpose tools other apps may rely on, so they're left installed." -ForegroundColor DarkGray
-    Write-Host "To remove them too, run:" -ForegroundColor DarkGray
-    Write-Host '  $script:RemoveDeps = $true; irm https://raw.githubusercontent.com/therajatshahare/ps1-scripts-win/main/uninstall.ps1 | iex' -ForegroundColor DarkGray
+    Write-Host "`nKeeping all dependencies installed." -ForegroundColor DarkGray
 }
 
 # -------------------------------
