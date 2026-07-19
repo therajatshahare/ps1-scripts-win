@@ -53,6 +53,18 @@ $depTable = @(
     @{ Cmd = "pwsh";   Winget = "Microsoft.PowerShell";  Name = "PowerShell 7" }
 )
 
+# Windows ships a fake python.exe / python3.exe under WindowsApps (the "App
+# execution alias") that Get-Command always finds, even when real Python was
+# never installed - it just opens the Microsoft Store if run. Filter that out
+# so we don't report a phantom install or a false removal failure.
+function Test-RealCommand {
+    param([string]$CmdName)
+    $c = Get-Command $CmdName -ErrorAction SilentlyContinue
+    if (-not $c) { return $false }
+    if ($c.Source -and $c.Source -like "*\WindowsApps\*") { return $false }
+    return $true
+}
+
 # $script:RemoveDeps can be pre-set to $true/$false to skip the prompt
 # (useful for automation). Otherwise we ask interactively below.
 $skipPrompt = Test-Path variable:script:RemoveDeps
@@ -178,7 +190,7 @@ if ($skipPrompt) {
 } else {
     Write-Host ""
     for ($i = 0; $i -lt $depTable.Count; $i++) {
-        $installed = if (Get-Command $depTable[$i].Cmd -ErrorAction SilentlyContinue) { "installed" } else { "not installed" }
+        $installed = if (Test-RealCommand $depTable[$i].Cmd) { "installed" } else { "not installed" }
         Write-Host ("  [{0}] {1} ({2})" -f ($i + 1), $depTable[$i].Name, $installed)
     }
     Write-Host ""
@@ -200,7 +212,7 @@ if ($selectedDeps.Count -gt 0) {
     $removedPython = $false
 
     foreach ($dep in $selectedDeps) {
-        if (Get-Command $dep.Cmd -ErrorAction SilentlyContinue) {
+        if (Test-RealCommand $dep.Cmd) {
 
             if ($dep.Cmd -eq "scoop") {
                 # Scoop manages itself entirely (its own folder + PATH entries).
@@ -232,14 +244,20 @@ if ($selectedDeps.Count -gt 0) {
 
                 # Confirm it's actually gone rather than trusting winget's exit code alone
                 Start-Sleep -Milliseconds 300
-                $stillPresent = [bool](Get-Command $dep.Cmd -ErrorAction SilentlyContinue)
+                $stillPresent = Test-RealCommand $dep.Cmd
 
                 if ($wingetOk -and -not $stillPresent) {
                     Write-Host "[OK] Uninstalled $($dep.Name)" -ForegroundColor Green
                     if ($dep.Cmd -eq "python") { $removedPython = $true }
                 } else {
-                    Write-Host "[FAIL] $($dep.Name) was not removed (still on PATH or winget reported an error)." -ForegroundColor Yellow
-                    Write-Host "  Find its exact package ID with 'winget list' and retry, or remove it from Settings > Apps." -ForegroundColor DarkGray
+                    $where = (Get-Command $dep.Cmd -ErrorAction SilentlyContinue).Source
+                    Write-Host "[FAIL] $($dep.Name) was not removed via winget (package id '$($dep.Winget)' not found on this system)." -ForegroundColor Yellow
+                    if ($where) {
+                        Write-Host "  It's installed here instead: $where" -ForegroundColor DarkGray
+                        Write-Host "  It wasn't installed by winget under that ID, so it needs to be removed manually (delete the folder / remove it from wherever it was installed)." -ForegroundColor DarkGray
+                    } else {
+                        Write-Host "  Run 'winget list' to find its real package ID and retry, or remove it from Settings > Apps." -ForegroundColor DarkGray
+                    }
                 }
             } else {
                 Write-Host "winget not found. Please remove $($dep.Name) manually." -ForegroundColor Yellow
@@ -249,8 +267,8 @@ if ($selectedDeps.Count -gt 0) {
         }
     }
 
-    # lyricsgenius pip package (only relevant if python is still around)
-    if (-not $removedPython -and (Get-Command python -ErrorAction SilentlyContinue)) {
+    # lyricsgenius pip package (only relevant if a real python is still around)
+    if (-not $removedPython -and (Test-RealCommand "python")) {
         try {
             python -m pip uninstall -y lyricsgenius
             Write-Host "[OK] Removed lyricsgenius (pip)" -ForegroundColor Green
