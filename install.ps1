@@ -34,11 +34,14 @@ if (-not $admin) {
     $targetDir = Join-Path $HOME "ps1-scripts-win"
 }
 
-# PowerShell profile path for current PowerShell version
-# Windows PowerShell 5.1 = Documents\WindowsPowerShell
-# PowerShell 7+ = Documents\PowerShell
-$profilePath = $PROFILE
-$profileDir  = Split-Path -Parent $profilePath
+# -------------------------------
+# PowerShell Profile Paths
+# -------------------------------
+
+$profilePaths = @(
+    "$HOME\Documents\WindowsPowerShell\Microsoft.PowerShell_profile.ps1",
+    "$HOME\Documents\PowerShell\Microsoft.PowerShell_profile.ps1"
+)
 
 $scripts = @(
     "ytvideo.ps1",
@@ -114,17 +117,6 @@ if (($env:PATH -split ';') -notcontains $targetDir) {
 }
 
 # -------------------------------
-# ENSURE PROFILE DIRECTORY / FILE
-# -------------------------------
-if (!(Test-Path $profileDir)) {
-    New-Item -ItemType Directory -Path $profileDir -Force | Out-Null
-}
-
-if (!(Test-Path $profilePath)) {
-    New-Item -ItemType File -Path $profilePath -Force | Out-Null
-}
-
-# -------------------------------
 # PROFILE SETUP
 # -------------------------------
 Write-Host "`nConfiguring PowerShell profile..." -ForegroundColor Cyan
@@ -190,39 +182,55 @@ function toolkit-help {
 # ===== End ps1-scripts-win Script Setup =====
 "@
 
-# Read profile safely as one string
-try {
-    $content = [System.IO.File]::ReadAllText($profilePath)
-} catch {
-    $content = ""
+foreach ($profilePath in $profilePaths) {
+
+    $profileDir = Split-Path -Parent $profilePath
+
+    # Ensure directory exists
+    if (!(Test-Path $profileDir)) {
+        New-Item -ItemType Directory -Path $profileDir -Force | Out-Null
+    }
+
+    # Ensure profile exists
+    if (!(Test-Path $profilePath)) {
+        New-Item -ItemType File -Path $profilePath -Force | Out-Null
+    }
+
+    # Read profile
+    try {
+        $content = [System.IO.File]::ReadAllText($profilePath)
+    }
+    catch {
+        $content = ""
+    }
+
+    # Remove previous toolkit block
+    $content = $content -replace '(?s)# ===== ps1-scripts-win Setup =====.*?# ===== End ps1-scripts-win Script Setup =====', ''
+    $content = $content -replace '(?s)# ===== ps1-scripts-win Setup =====.*?# ===== End ps1-scripts-win =====', ''
+
+    # Append new toolkit block
+    if ([string]::IsNullOrWhiteSpace($content)) {
+        $newContent = $profileBlock
+    }
+    else {
+        $newContent = $content.Trim() + "`r`n`r`n" + $profileBlock
+    }
+
+    [System.IO.File]::WriteAllText(
+        $profilePath,
+        $newContent,
+        [System.Text.UTF8Encoding]::new($false)
+    )
+
+    Write-Host "✔ Updated profile: $profilePath" -ForegroundColor Green
 }
 
-# Remove old/broken ps1-scripts-win blocks
-$content = $content -replace '(?s)# ===== ps1-scripts-win Setup =====.*?# ===== End ps1-scripts-win Script Setup =====', ''
-$content = $content -replace '(?s)# ===== ps1-scripts-win Setup =====.*?# ===== End ps1-scripts-win =====', ''
-
-# Write clean profile
-if ([string]::IsNullOrWhiteSpace($content)) {
-    $newContent = $profileBlock
-} else {
-    $newContent = $content.Trim() + "`r`n`r`n" + $profileBlock
-}
-
-[System.IO.File]::WriteAllText(
-    $profilePath,
-    $newContent,
-    [System.Text.UTF8Encoding]::new($false)
-)
-
-Write-Host "Profile updated successfully" -ForegroundColor Green
-Write-Host "Profile path: $profilePath" -ForegroundColor DarkGray
-
-# Reload profile safely
+# Reload only the current PowerShell session
 try {
-    . $profilePath
-} catch {
-    Write-Host "Profile updated, but could not be reloaded in this session." -ForegroundColor Yellow
-    Write-Host "Restart PowerShell after setup completes." -ForegroundColor Yellow
+    . $PROFILE
+}
+catch {
+    Write-Host "Profile updated. Restart PowerShell after setup completes." -ForegroundColor Yellow
 }
 
 # -------------------------------
