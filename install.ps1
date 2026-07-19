@@ -270,6 +270,32 @@ Install-IfMissing "aria2c" "aria2.aria2"
 Install-IfMissing "python" "Python.Python.3"
 
 # -------------------------------
+# POWERSHELL 7
+# -------------------------------
+if (-not (Get-Command pwsh -ErrorAction SilentlyContinue)) {
+
+    Write-Host "PowerShell 7 not found. Installing..." -ForegroundColor Cyan
+
+    if (Get-Command winget -ErrorAction SilentlyContinue) {
+        try {
+            winget install --id Microsoft.PowerShell -e --silent --accept-package-agreements --accept-source-agreements
+            Write-Host "✔ PowerShell 7 installed." -ForegroundColor Green
+            Write-Host "Restart PowerShell after setup to use the new features." -ForegroundColor Yellow
+        }
+        catch {
+            Write-Host "✖ Failed to install PowerShell 7." -ForegroundColor Yellow
+        }
+    }
+    else {
+        Write-Host "winget not found. Please install PowerShell 7 manually." -ForegroundColor Yellow
+    }
+
+}
+else {
+    Write-Host "PowerShell 7 already installed"
+}
+
+# -------------------------------
 # POWERSHELL MODULES
 # -------------------------------
 Write-Host "`nInstalling PowerShell modules..." -ForegroundColor Cyan
