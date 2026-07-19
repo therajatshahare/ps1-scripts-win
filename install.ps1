@@ -287,6 +287,16 @@ function Install-Scoop {
         return
     }
 
+    if ($admin) {
+        # Scoop's official installer refuses to run under an elevated session
+        # by design - it's meant to be a per-user tool with no admin
+        # dependency, so it silently bails rather than install as admin.
+        Write-Host "✖ Skipping scoop - it cannot be installed from an Administrator session." -ForegroundColor Yellow
+        Write-Host "  This is intentional on Scoop's part, not a bug here." -ForegroundColor DarkGray
+        Write-Host "  Re-run this installer from a normal (non-Administrator) PowerShell window to get scoop." -ForegroundColor DarkGray
+        return
+    }
+
     # Scoop is not reliably published on winget (its manifest submission was
     # never accepted into winget-pkgs), so it must be installed via its own
     # official bootstrap script instead of "winget install".
