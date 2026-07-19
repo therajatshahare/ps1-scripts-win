@@ -139,25 +139,17 @@ $profileBlock = @"
 # PowerShell Enhancements
 # -------------------------------
 
-try {
-    Import-Module PSReadLine -ErrorAction Stop
+Import-Module PSReadLine
 
-    Set-PSReadLineOption -MaximumHistoryCount 10000
-    Set-PSReadLineOption -BellStyle None
-    Set-PSReadLineKeyHandler -Key Tab -Function MenuComplete
+Set-PSReadLineOption -MaximumHistoryCount 10000
+Set-PSReadLineOption -BellStyle None
+Set-PSReadLineKeyHandler -Key Tab -Function MenuComplete
 
-    # Prediction features are available only in PowerShell 7+
-    if ($PSVersionTable.PSVersion.Major -ge 7) {
-        Import-Module CompletionPredictor -ErrorAction SilentlyContinue
+if ($PSVersionTable.PSVersion.Major -ge 7) {
+    Import-Module CompletionPredictor -ErrorAction SilentlyContinue
 
-        Set-PSReadLineOption -PredictionSource HistoryAndPlugin
-        Set-PSReadLineOption -PredictionViewStyle ListView
-    }
-
-}
-catch {
-    Write-Host "PSReadLine could not be loaded." -ForegroundColor Yellow
-    Write-Host "Error: $($_.Exception.Message)" -ForegroundColor Red
+    Set-PSReadLineOption -PredictionSource HistoryAndPlugin
+    Set-PSReadLineOption -PredictionViewStyle ListView
 }
 
 if (!(Test-Path `$scriptDir)) {
