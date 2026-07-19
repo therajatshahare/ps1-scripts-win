@@ -145,7 +145,7 @@ Set-PSReadLineOption -MaximumHistoryCount 10000
 Set-PSReadLineOption -BellStyle None
 Set-PSReadLineKeyHandler -Key Tab -Function MenuComplete
 
-if ($PSVersionTable.PSVersion.Major -ge 7) {
+if (`$PSVersionTable.PSVersion.Major -ge 7) {
     Import-Module CompletionPredictor -ErrorAction SilentlyContinue
 
     Set-PSReadLineOption -PredictionSource HistoryAndPlugin
