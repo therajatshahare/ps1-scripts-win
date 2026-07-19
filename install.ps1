@@ -248,19 +248,30 @@ try {
 # -------------------------------
 Write-Host "`nInstalling dependencies..." -ForegroundColor Cyan
 
+function Test-RealCommand {
+    param([string]$CmdName)
+    $c = Get-Command $CmdName -ErrorAction SilentlyContinue
+    if (-not $c) { return $false }
+    if ($c.Source -and $c.Source -like "*\WindowsApps\*") { return $false }
+    return $true
+}
+
 function Install-IfMissing {
     param(
         [string]$cmd,
         [string]$wingetName
     )
 
-    if (!(Get-Command $cmd -ErrorAction SilentlyContinue)) {
+    # Windows ships a fake python.exe / python3.exe under WindowsApps (the "App
+    # execution alias") that Get-Command always finds even when real Python is
+    # not installed - it just opens the Microsoft Store if run. Treat that as
+    # "missing" so we don't skip a real install.
+    if (!(Test-RealCommand $cmd)) {
         if (Get-Command winget -ErrorAction SilentlyContinue) {
             Write-Host "Installing $cmd..."
-            try {
-                winget install --id $wingetName -e --silent --accept-package-agreements --accept-source-agreements
-            } catch {
-                Write-Host "✖ Failed to install $cmd using winget" -ForegroundColor Yellow
+            winget install --id $wingetName -e --silent --accept-package-agreements --accept-source-agreements
+            if ($LASTEXITCODE -ne 0) {
+                Write-Host "✖ Failed to install $cmd using winget (exit code $LASTEXITCODE)" -ForegroundColor Yellow
             }
         } else {
             Write-Host "winget not found. Please install $cmd manually." -ForegroundColor Yellow
@@ -270,8 +281,27 @@ function Install-IfMissing {
     }
 }
 
+function Install-Scoop {
+    if (Get-Command scoop -ErrorAction SilentlyContinue) {
+        Write-Host "scoop already installed"
+        return
+    }
+
+    # Scoop is not reliably published on winget (its manifest submission was
+    # never accepted into winget-pkgs), so it must be installed via its own
+    # official bootstrap script instead of "winget install".
+    Write-Host "Installing scoop..."
+    try {
+        Set-ExecutionPolicy RemoteSigned -Scope CurrentUser -Force
+        Invoke-RestMethod -Uri https://get.scoop.sh | Invoke-Expression
+    } catch {
+        Write-Host "✖ Failed to install scoop" -ForegroundColor Yellow
+        Write-Host "  $($_.Exception.Message)" -ForegroundColor DarkGray
+    }
+}
+
 Install-IfMissing "git" "Git.Git"
-Install-IfMissing "scoop" "ScoopInstaller.Scoop"
+Install-Scoop
 Install-IfMissing "yt-dlp" "yt-dlp.yt-dlp"
 Install-IfMissing "ffmpeg" "Gyan.FFmpeg"
 Install-IfMissing "aria2c" "aria2.aria2"
@@ -365,7 +395,7 @@ if (Get-Command scoop -ErrorAction SilentlyContinue) {
 # -------------------------------
 # PYTHON PACKAGES
 # -------------------------------
-if (Get-Command python -ErrorAction SilentlyContinue) {
+if (Test-RealCommand "python") {
     try {
         python -m pip install --upgrade pip
     } catch {
