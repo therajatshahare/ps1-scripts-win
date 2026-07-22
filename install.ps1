@@ -295,6 +295,73 @@ function Install-IfMissing {
     }
 }
 
+function Update-SessionPath {
+    # Installers (winget or the .exe fallback below) update the registry's
+    # Machine/User PATH, but the *current* PowerShell session keeps its own
+    # cached copy of $env:PATH from when it started. Without this, a freshly
+    # installed tool won't be found until you close and reopen PowerShell.
+    $machinePath = [Environment]::GetEnvironmentVariable("Path", "Machine")
+    $userPath    = [Environment]::GetEnvironmentVariable("Path", "User")
+    $env:PATH = @($machinePath, $userPath) -join ';'
+}
+
+function Install-Python {
+    if (Test-RealCommand "python") {
+        Write-Host "python already installed"
+        return
+    }
+
+    $installed = $false
+
+    if (Get-Command winget -ErrorAction SilentlyContinue) {
+        Write-Host "Installing python..."
+
+        # "No package found matching input criteria" for a package ID that
+        # definitely exists (Python.Python.3) almost always means winget's
+        # local source index is stale, not that the package is missing.
+        # Refreshing it first fixes this in most cases.
+        try { winget source update | Out-Null } catch {}
+
+        winget install --id Python.Python.3 -e --source winget --silent --accept-package-agreements --accept-source-agreements
+        if ($LASTEXITCODE -eq 0) {
+            $installed = $true
+            Write-Host "✔ python installed via winget" -ForegroundColor Green
+        } else {
+            Write-Host "✖ winget install of python failed (exit code $LASTEXITCODE)" -ForegroundColor Yellow
+        }
+    } else {
+        Write-Host "winget not found." -ForegroundColor Yellow
+    }
+
+    if (-not $installed) {
+        # Fallback so setup doesn't depend on winget's index being healthy:
+        # grab the official installer straight from python.org and run it
+        # silently. This also covers machines without winget at all.
+        Write-Host "Falling back to a direct download from python.org..." -ForegroundColor Cyan
+        try {
+            $installerUrl  = "https://www.python.org/ftp/python/3.13.5/python-3.13.5-amd64.exe"
+            $installerPath = Join-Path $env:TEMP "python-installer.exe"
+
+            Invoke-WebRequest -Uri $installerUrl -OutFile $installerPath -UseBasicParsing
+            Start-Process -FilePath $installerPath `
+                -ArgumentList "/quiet InstallAllUsers=0 PrependPath=1 Include_launcher=0" `
+                -Wait
+            Remove-Item $installerPath -ErrorAction SilentlyContinue
+
+            $installed = $true
+            Write-Host "✔ python installed via direct download" -ForegroundColor Green
+        } catch {
+            Write-Host "✖ Failed to install python via direct download" -ForegroundColor Red
+            Write-Host "  $($_.Exception.Message)" -ForegroundColor DarkGray
+            Write-Host "  Please install it manually from https://www.python.org/downloads/" -ForegroundColor Yellow
+        }
+    }
+
+    if ($installed) {
+        Update-SessionPath
+    }
+}
+
 function Install-Scoop {
     if (Get-Command scoop -ErrorAction SilentlyContinue) {
         Write-Host "scoop already installed"
@@ -329,7 +396,7 @@ Install-Scoop
 Install-IfMissing "yt-dlp" "yt-dlp.yt-dlp"
 Install-IfMissing "ffmpeg" "Gyan.FFmpeg"
 Install-IfMissing "aria2c" "aria2.aria2"
-Install-IfMissing "python" "Python.Python.3"
+Install-Python
 
 # -------------------------------
 # POWERSHELL 7
@@ -419,6 +486,8 @@ if (Get-Command scoop -ErrorAction SilentlyContinue) {
 # -------------------------------
 # PYTHON PACKAGES
 # -------------------------------
+Update-SessionPath
+
 if (Test-RealCommand "python") {
     try {
         python -m pip install --upgrade pip
@@ -432,7 +501,7 @@ if (Test-RealCommand "python") {
         Write-Host "Could not install lyricsgenius." -ForegroundColor Yellow
     }
 } else {
-    Write-Host "Python not found in current session. Restart PowerShell and check again." -ForegroundColor Yellow
+    Write-Host "Python still not detected. Restart PowerShell and run 'update-scripts' again to retry." -ForegroundColor Yellow
 }
 
 # -------------------------------
