@@ -252,7 +252,21 @@ function Test-RealCommand {
     param([string]$CmdName)
     $c = Get-Command $CmdName -ErrorAction SilentlyContinue
     if (-not $c) { return $false }
-    if ($c.Source -and $c.Source -like "*\WindowsApps\*") { return $false }
+
+    if ($c.Source -and $c.Source -like "*\WindowsApps\*") {
+        # WindowsApps can hold either a real Store-installed interpreter
+        # (works fine) or an empty "app execution alias" stub that just
+        # opens the Microsoft Store when run. Path alone can't tell them
+        # apart, so actually try running it and check for real output.
+        try {
+            $out = & $CmdName --version 2>&1
+            if ($LASTEXITCODE -eq 0 -and $out -match '\d+\.\d+(\.\d+)?') {
+                return $true
+            }
+        } catch {}
+        return $false
+    }
+
     return $true
 }
 
