@@ -552,6 +552,12 @@ if (Test-RealCommand "python") {
     } catch {
         Write-Host "Could not install lyricsgenius." -ForegroundColor Yellow
     }
+
+    try {
+        python -m pip install instaloader
+    } catch {
+        Write-Host "Could not install instaloader." -ForegroundColor Yellow
+    }
 } else {
     Write-Host "Python still not detected. Restart PowerShell and run 'update-scripts' again to retry." -ForegroundColor Yellow
 }
