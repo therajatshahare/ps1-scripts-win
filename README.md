@@ -79,6 +79,7 @@ After installing, configure your terminal so the toolkit runs the way it's meant
 | `aria2` | Fast multi-connection downloads |
 | `python` | Runs helper scripts |
 | `lyricsgenius` | Fetches song lyrics |
+| `instaloader` | Download Instagram video/pictures |
 | `fastfetch` | System info display |
 
 ---
