@@ -1,4 +1,4 @@
-$toolkitVersion = "1.2.05"
+$toolkitVersion = "1.2.06"
 Write-Host "ps1-scripts-win Version: $toolkitVersion"
 
 # ================================
@@ -179,6 +179,13 @@ function update-scripts {
 function toolkit-help {
     & "`$scriptDir\toolkit-help.ps1" @args
 }
+
+# -------------------------------
+# Fastfetch on shell start
+# -------------------------------
+if (Get-Command fastfetch -ErrorAction SilentlyContinue) {
+    fastfetch
+}
 # ===== End ps1-scripts-win Script Setup =====
 "@
 
@@ -231,6 +238,50 @@ try {
 }
 catch {
     Write-Host "Profile updated. Restart PowerShell after setup completes." -ForegroundColor Yellow
+}
+
+# -------------------------------
+# CMD.EXE AUTORUN (fastfetch)
+# -------------------------------
+Write-Host "`nConfiguring cmd.exe startup..." -ForegroundColor Cyan
+
+$cmdAutorunScript = Join-Path $targetDir "autorun.cmd"
+
+$autorunContent = @"
+@echo off
+where fastfetch >nul 2>nul
+if %errorlevel% equ 0 (
+    fastfetch
+)
+"@
+
+try {
+    Set-Content -Path $cmdAutorunScript -Value $autorunContent -Encoding ASCII
+
+    $autorunKeyPath = "HKCU:\Software\Microsoft\Command Processor"
+    if (!(Test-Path $autorunKeyPath)) {
+        New-Item -Path $autorunKeyPath -Force | Out-Null
+    }
+
+    $existingAutoRun = (Get-ItemProperty -Path $autorunKeyPath -Name AutoRun -ErrorAction SilentlyContinue).AutoRun
+    $callCmd = "call `"$cmdAutorunScript`""
+
+    if ([string]::IsNullOrWhiteSpace($existingAutoRun)) {
+        # No existing AutoRun - just point it at our script
+        $newAutoRun = $callCmd
+    } elseif ($existingAutoRun -like "*$cmdAutorunScript*") {
+        # Already configured from a previous run of this installer
+        $newAutoRun = $existingAutoRun
+    } else {
+        # Preserve whatever the user already had AutoRun doing
+        $newAutoRun = "$existingAutoRun & $callCmd"
+    }
+
+    Set-ItemProperty -Path $autorunKeyPath -Name AutoRun -Value $newAutoRun
+    Write-Host "✔ cmd.exe will run fastfetch on startup" -ForegroundColor Green
+} catch {
+    Write-Host "✖ Failed to configure cmd.exe AutoRun" -ForegroundColor Yellow
+    Write-Host "  $($_.Exception.Message)" -ForegroundColor DarkGray
 }
 
 # -------------------------------
@@ -396,6 +447,7 @@ Install-Scoop
 Install-IfMissing "yt-dlp" "yt-dlp.yt-dlp"
 Install-IfMissing "ffmpeg" "Gyan.FFmpeg"
 Install-IfMissing "aria2c" "aria2.aria2"
+Install-IfMissing "fastfetch" "Fastfetch-cli.Fastfetch"
 Install-Python
 
 # -------------------------------
