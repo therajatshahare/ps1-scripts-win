@@ -1,80 +1,59 @@
 # ⚙️ "ps1-scripts-win" Toolkit
-
 A personal **PowerShell CLI toolkit** for everyday automation, media handling, and utilities — install everything with **one command**.
-
 ---
 ## 🤖 Open a PowerShell terminal (version 5.1 or later) and from the PS C:\> prompt, run:
-
 ```powershell
 Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
 ```
-
 ## 🚀 Then, One-Line Install
-
 ```powershell
 irm https://raw.githubusercontent.com/therajatshahare/ps1-scripts-win/main/install.ps1 | iex
 ```
-
 > ⚠️ Restart PowerShell after installation.
-
 ---
-
 ## 📂 What This Does
-
 * Installs all scripts to:
-
   ```
   $HOME\ps1-scripts-win
   ```
 * Adds scripts to PATH
 * Configures PowerShell profile automatically
 * Installs required dependencies:
-
   * yt-dlp
   * ffmpeg
   * aria2
   * python
   * lyricsgenius
-
+  * fastfetch
 ---
-
 ## 🧰 Available Commands
-
 ### 🎥 Media / YouTube
-
 ```powershell
 ytvideo
 vytvideo
 ytaudio
 ```
-
 ### 🎵 Metadata / Lyrics
-
 ```powershell
 showmeta
 showformat
 showlyrics
 ```
-
 ### 📁 File Utilities
-
 ```powershell
 folders
 hide
 unhide
 exifpic
 ```
-
 ### ⚡ System Utilities
-
 ```powershell
 update
 upgrade
 aria
+fastfetch
 ```
-
 ### 📸 Instagram
-
 * To add the user accounts use "ask" command. It'll trigger to add the new user account ID & Password. If the new account detected then it'll ask to save the userid and allot the specific number ex. 1,2,3,... etc.
 ```powershell
 insta <username> full ask
@@ -84,46 +63,41 @@ insta <username> full ask
 insta <username> full "1/2/3/..."
 insta <username> update "1/2/3/..."
 ```
-
 ### 🔁 Toolkit Update
-
 ```powershell
 update-scripts
 ```
-
 ---
-
 ### 📖 Help System
-
 Get help directly in terminal:
-
 ```powershell
 toolkit-help
 ```
-
 Command-specific help:
-
 ```powershell
 toolkit-help ytvideo
 toolkit-help insta
 toolkit-help exifpic
 toolkit-help "script names"
 ```
-
 ---
-
 ## 🎵 Lyrics Setup (Required for showlyrics)
 
+### How to get your Genius Token
+1. Go to [genius.com/api-clients](https://genius.com/api-clients) and sign in (or create a free Genius account if you don't have one).
+2. Click **"New API Client"**.
+3. Fill in an **App Name** and **App Website URL** (these can be anything — they don't need to be real).
+4. Click **"Save"**. You'll now see your client listed under API Clients.
+5. Click **"Generate Access Token"** next to your new client.
+6. Copy the generated **Client Access Token** — this is your `GENIUS_TOKEN`.
+
+Once you have it, set it as an environment variable:
 ```powershell
 [Environment]::SetEnvironmentVariable("GENIUS_TOKEN", "your_token_here", "User")
 ```
-
 Restart PowerShell after setting.
-
 ---
-
 ## 📦 Project Structure
-
 ```
 ps1-scripts-win/
 │
@@ -148,38 +122,25 @@ ps1-scripts-win/
     ├── toolkit-help.ps1
     └── lyrics.py
 ```
-
 ---
-
 ## 🧠 Design Philosophy
-
 * One-command setup
 * No admin required
 * Portable across systems
 * Self-healing configuration
 * Minimal dependencies
-
 ---
-
 ## ⚠️ Notes
-
 * Designed for Windows + PowerShell
 * Works best without Administrator mode
-
 ---
 ## 🚀 For Uninstallation Run
-
 ```powershell
 irm https://raw.githubusercontent.com/therajatshahare/ps1-scripts-win/main/uninstall.ps1 | iex
 ```
-
 ## ⭐ Author
-
 Rajat Shahare
 https://github.com/therajatshahare
-
 ---
-
 ## 🛠️ License
-
 Personal toolkit — use freely and modify as needed.
