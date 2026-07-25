@@ -9,14 +9,14 @@
       - Strips the toolkit block out of both PowerShell profile files
       - Optionally removes the PSGallery modules the installer added
       - Optionally uninstalls the winget dependencies the installer added
-        (git, scoop, yt-dlp, ffmpeg, aria2, python, PowerShell 7)
+        (git, scoop, yt-dlp, ffmpeg, aria2, python, fastfetch, PowerShell 7)
         -- OFF by default, since other software may depend on these.
 
 .USAGE
     irm https://raw.githubusercontent.com/therajatshahare/ps1-scripts-win/main/uninstall.ps1 | iex
 
     You'll be prompted interactively for which dependencies (if any) to
-    also remove (git, python, ffmpeg, yt-dlp, aria2, scoop, PowerShell 7).
+    also remove (git, python, ffmpeg, yt-dlp, aria2, fastfetch, scoop, PowerShell 7).
 
     To skip the prompt entirely (non-interactive/CI use):
     $script:RemoveDeps = $false   # keep all dependencies
@@ -44,13 +44,14 @@ $profilePaths = @(
 
 # Dependency list: command to check for, winget package id, display name
 $depTable = @(
-    @{ Cmd = "git";    Winget = "Git.Git";           Name = "Git" }
-    @{ Cmd = "python"; Winget = "Python.Python.3";   Name = "Python" }
-    @{ Cmd = "ffmpeg"; Winget = "Gyan.FFmpeg";       Name = "FFmpeg" }
-    @{ Cmd = "yt-dlp"; Winget = "yt-dlp.yt-dlp";     Name = "yt-dlp" }
-    @{ Cmd = "aria2c"; Winget = "aria2.aria2";       Name = "aria2" }
-    @{ Cmd = "scoop";  Winget = "ScoopInstaller.Scoop"; Name = "Scoop" }
-    @{ Cmd = "pwsh";   Winget = "Microsoft.PowerShell";  Name = "PowerShell 7" }
+    @{ Cmd = "git";       Winget = "Git.Git";              Name = "Git" }
+    @{ Cmd = "python";    Winget = "Python.Python.3";      Name = "Python" }
+    @{ Cmd = "ffmpeg";    Winget = "Gyan.FFmpeg";          Name = "FFmpeg" }
+    @{ Cmd = "yt-dlp";    Winget = "yt-dlp.yt-dlp";        Name = "yt-dlp" }
+    @{ Cmd = "aria2c";    Winget = "aria2.aria2";          Name = "aria2" }
+    @{ Cmd = "fastfetch"; Winget = "Fastfetch-cli.Fastfetch"; Name = "fastfetch" }
+    @{ Cmd = "scoop";     Winget = "ScoopInstaller.Scoop"; Name = "Scoop" }
+    @{ Cmd = "pwsh";      Winget = "Microsoft.PowerShell"; Name = "PowerShell 7" }
 )
 
 # Windows ships a fake python.exe / python3.exe under WindowsApps (the "App
