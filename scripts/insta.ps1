@@ -199,7 +199,7 @@ switch ($Mode) {
     "update" {
         Write-Host "Running FAST UPDATE mode..." -ForegroundColor Yellow
 
-        $instaOutput = instaloader `
+        $instaOutput = python -m instaloader `
             --login $LoginUser `
             --fast-update `
             --abort-on=400,401,403,429 `
@@ -211,7 +211,7 @@ switch ($Mode) {
     "full" {
         Write-Host "Running FULL DOWNLOAD mode..." -ForegroundColor Yellow
 
-        $instaOutput = instaloader `
+        $instaOutput = python -m instaloader `
             --login $LoginUser `
             --abort-on=400,401,403,429 `
             $Username 2>&1
