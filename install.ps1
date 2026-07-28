@@ -448,6 +448,7 @@ Install-IfMissing "yt-dlp" "yt-dlp.yt-dlp"
 Install-IfMissing "ffmpeg" "Gyan.FFmpeg"
 Install-IfMissing "aria2c" "aria2.aria2"
 Install-IfMissing "fastfetch" "Fastfetch-cli.Fastfetch"
+Install-IfMissing "exiftool" "OliverBetz.ExifTool"
 Install-Python
 
 # -------------------------------
