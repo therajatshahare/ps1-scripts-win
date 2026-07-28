@@ -1,4 +1,4 @@
-$toolkitVersion = "1.2.06"
+$toolkitVersion = "1.2.07"
 Write-Host "ps1-scripts-win Version: $toolkitVersion"
 
 # ================================
