@@ -16,6 +16,8 @@ if (-not $DateTime) {
 # If specific file is provided
 if ($File) {
     exiftool -overwrite_original `
+        "-DateTimeOriginal=$DateTime" `
+        "-CreateDate=$DateTime" `
         "-FileModifyDate=$DateTime" `
         "-FileCreateDate=$DateTime" `
         "$File"
@@ -23,8 +25,10 @@ if ($File) {
 }
 
 # Otherwise, process all JPG and PNG files in current directory
-Get-ChildItem -File -Include *.jpg, *.png | ForEach-Object {
+Get-ChildItem -Path .\* -File -Include *.jpg, *.png | ForEach-Object {
     exiftool -overwrite_original `
+        "-DateTimeOriginal=$DateTime" `
+        "-CreateDate=$DateTime" `
         "-FileModifyDate=$DateTime" `
         "-FileCreateDate=$DateTime" `
         "$($_.FullName)"
