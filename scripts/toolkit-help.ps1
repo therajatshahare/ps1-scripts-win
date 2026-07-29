@@ -26,7 +26,7 @@ if (-not $Command) {
     Write-Host "  showlyrics   -> Fetch lyrics"
 
     Write-Host "`nFile Utilities" -ForegroundColor Yellow
-    Write-Host "  folders   -> List folders"
+    Write-Host "  folders   -> List folders (filter, depth, tree view)"
     Write-Host "  hide      -> Hide file"
     Write-Host "  unhide    -> Unhide file"
     Write-Host "  exifpic   -> Modify EXIF data"
@@ -181,6 +181,43 @@ switch ($Command.ToLower()) {
         Write-Host ""
         Write-Host "Example:"
         Write-Host "  showlyrics ""song.flac"""
+    }
+
+    "folders" {
+        Write-Host "folders [path] [-Depth n] [-Filter pattern] [-Exclude patterns] [-Tree] [-ExcludeHidden]" -ForegroundColor Cyan
+        Write-Host "List folders, with filtering, depth limits, and tree view"
+        Write-Host ""
+        Write-Host "Examples:"
+        Write-Host "  folders"
+        Write-Host "    -> List all folders under the current directory"
+        Write-Host ""
+        Write-Host "  folders -Tree"
+        Write-Host "    -> Same listing, shown as an indented tree"
+        Write-Host ""
+        Write-Host "  folders D:\Projects -Depth 2"
+        Write-Host "    -> Only 2 levels deep, starting from D:\Projects"
+        Write-Host ""
+        Write-Host "  folders -Filter ""*cache*"""
+        Write-Host "    -> Only folders with ""cache"" in the name"
+        Write-Host ""
+        Write-Host "  folders -Exclude @()"
+        Write-Host "    -> Don't exclude anything, show every folder"
+        Write-Host ""
+        Write-Host "Parameters:"
+        Write-Host "  path             -> Starting directory (default: current directory)"
+        Write-Host "  -Depth n         -> Limit recursion to n levels deep"
+        Write-Host "  -Filter pattern  -> Only show folders matching a wildcard, e.g. ""*backup*"""
+        Write-Host "  -Exclude list    -> Folder name patterns to skip (defaults below)"
+        Write-Host "  -Tree            -> Show as an indented tree instead of a flat path list"
+        Write-Host "  -ExcludeHidden   -> Hide hidden folders (shown by default)"
+        Write-Host ""
+        Write-Host "Default exclusions:"
+        Write-Host "  .git, node_modules, `$RECYCLE.BIN, System Volume Information, .venv, __pycache__"
+        Write-Host ""
+        Write-Host "Notes:"
+        Write-Host "  - Hidden folders are shown in dark gray to distinguish them"
+        Write-Host "  - Folders skipped due to access errors are summarized, not shown one-by-one"
+        Write-Host "  - Output is sorted alphabetically by full path"
     }
 
     default {
