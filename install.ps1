@@ -321,6 +321,54 @@ function Test-RealCommand {
     return $true
 }
 
+function Add-ToUserPath {
+    param([string]$Dir)
+
+    if (-not $Dir) { return }
+
+    $currentPath = [Environment]::GetEnvironmentVariable("Path", "User")
+    $pathParts = $currentPath -split ';' | Where-Object { $_ -ne "" }
+
+    if ($pathParts -notcontains $Dir) {
+        $newPath = ($pathParts + $Dir) -join ';'
+        [Environment]::SetEnvironmentVariable("Path", $newPath, "User")
+        Write-Host "✔ Added to PATH: $Dir" -ForegroundColor Green
+    }
+
+    if (($env:PATH -split ';') -notcontains $Dir) {
+        $env:PATH = "$env:PATH;$Dir"
+    }
+}
+
+function Repair-WinGetPackagePath {
+    # Some winget packages are portable ZIP extracts rather than proper
+    # installers (aria2 is one) - winget shows them as "installed" and
+    # unpacks them under its own Packages folder, but never registers
+    # that folder in PATH. If Test-RealCommand still can't find the exe
+    # after a successful winget install, search for it under winget's
+    # package cache and add its folder to PATH directly. The subfolder
+    # name includes the version, so this is done by search, not by a
+    # hardcoded path, and keeps working across version upgrades.
+    param(
+        [string]$Cmd,
+        [string]$WingetName
+    )
+
+    $packagesRoot = "$env:LOCALAPPDATA\Microsoft\WinGet\Packages"
+    if (-not (Test-Path $packagesRoot)) { return $false }
+
+    $exeName = "$Cmd.exe"
+    $match = Get-ChildItem "$packagesRoot\$WingetName*" -Recurse -Filter $exeName -ErrorAction SilentlyContinue |
+        Select-Object -First 1
+
+    if ($match) {
+        Add-ToUserPath $match.DirectoryName
+        return (Test-RealCommand $Cmd)
+    }
+
+    return $false
+}
+
 function Install-IfMissing {
     param(
         [string]$cmd,
@@ -335,8 +383,24 @@ function Install-IfMissing {
         if (Get-Command winget -ErrorAction SilentlyContinue) {
             Write-Host "Installing $cmd..."
             winget install --id $wingetName -e --silent --accept-package-agreements --accept-source-agreements
-            if ($LASTEXITCODE -ne 0) {
-                Write-Host "✖ Failed to install $cmd using winget (exit code $LASTEXITCODE)" -ForegroundColor Yellow
+            $exitCode = $LASTEXITCODE
+
+            # -1978335189 (0x8A15002B) is winget's "no applicable update found",
+            # which winget returns when the package is already installed and
+            # up to date - not a real failure. Anything else genuinely failed.
+            if ($exitCode -ne 0 -and $exitCode -ne -1978335189) {
+                Write-Host "✖ Failed to install $cmd using winget (exit code $exitCode)" -ForegroundColor Yellow
+                return
+            }
+
+            if (!(Test-RealCommand $cmd)) {
+                # Installed (or already present) but not on PATH - likely a
+                # portable/ZIP-style winget package. Try to locate and fix it.
+                if (Repair-WinGetPackagePath -Cmd $cmd -WingetName $wingetName) {
+                    Write-Host "✔ $cmd found and added to PATH" -ForegroundColor Green
+                } else {
+                    Write-Host "⚠ $cmd installed but not found on PATH. You may need to restart PowerShell or add it to PATH manually." -ForegroundColor Yellow
+                }
             }
         } else {
             Write-Host "winget not found. Please install $cmd manually." -ForegroundColor Yellow
@@ -442,11 +506,39 @@ function Install-Scoop {
     }
 }
 
+function Install-Aria2 {
+    # aria2's winget package (aria2.aria2) is a portable ZIP extract, not a
+    # real installer - winget marks it "installed" but never registers its
+    # folder in PATH, and that folder's name changes on every version bump.
+    # Scoop, on the other hand, is built exactly for portable apps: it adds
+    # one shims folder to PATH once and repoints a "current" symlink per app
+    # on every update, so aria2c keeps working across upgrades with no
+    # extra repair step. Prefer scoop when it's available; fall back to
+    # winget (with PATH repair) only when scoop isn't usable, e.g. an
+    # Administrator session, where Install-Scoop above intentionally skips.
+    if (Get-Command scoop -ErrorAction SilentlyContinue) {
+        if (Get-Command aria2c -ErrorAction SilentlyContinue) {
+            Write-Host "aria2c already installed"
+        } else {
+            Write-Host "Installing aria2c via scoop..."
+            try {
+                scoop install aria2
+            } catch {
+                Write-Host "✖ Failed to install aria2c via scoop" -ForegroundColor Yellow
+                Write-Host "  $($_.Exception.Message)" -ForegroundColor DarkGray
+            }
+        }
+    } else {
+        Write-Host "Scoop not available, falling back to winget for aria2c..." -ForegroundColor DarkGray
+        Install-IfMissing "aria2c" "aria2.aria2"
+    }
+}
+
 Install-IfMissing "git" "Git.Git"
 Install-Scoop
 Install-IfMissing "yt-dlp" "yt-dlp.yt-dlp"
 Install-IfMissing "ffmpeg" "Gyan.FFmpeg"
-Install-IfMissing "aria2c" "aria2.aria2"
+Install-Aria2
 Install-IfMissing "fastfetch" "Fastfetch-cli.Fastfetch"
 Install-IfMissing "exiftool" "OliverBetz.ExifTool"
 Install-Python
