@@ -16,19 +16,25 @@ if (-not (Get-Command yt-dlp -ErrorAction SilentlyContinue)) {
 # Argument handling
 # -------------------------------
 # Supported call styles:
+#   ytvideo "playlist URL"                    -> playlist, highest quality, auto-named
+#   ytvideo "resolution" "playlist URL"       -> playlist, auto-named, no rename
 #   ytvideo "filename" "URL"                  -> single video, no resolution
 #   ytvideo "resolution" "filename" "URL"     -> single video, with resolution
-#   ytvideo "resolution" "playlist URL"       -> playlist, auto-named, no rename
-$isPlaylist = $false
 
-if (-not $url) {
+if (-not $filename -and -not $url) {
+    # Only 1 arg supplied -> could be a bare URL (no resolution, no filename)
+    if ($res -match '^https?://') {
+        $url = $res
+        $res = ""
+    }
+} elseif (-not $url) {
+    # 2 args supplied
     if ($filename -match '^https?://') {
-        # 2 args given, and the 2nd one is a URL -> "resolution" + "playlist URL"
+        # "resolution" + "URL"
         $url = $filename
         $filename = ""
-        $isPlaylist = $true
     } else {
-        # 2 args given, old style -> "filename" + "URL" (no resolution)
+        # "filename" + "URL" (old style, no resolution)
         $url = $filename
         $filename = $res
         $res = ""
@@ -39,8 +45,12 @@ if (-not $url) {
     Write-Host 'Usage:'
     Write-Host '  ytvideo [resolution] "filename" "URL"    (single video)'
     Write-Host '  ytvideo [resolution] "playlist URL"      (playlist, auto-named)'
+    Write-Host '  ytvideo "playlist URL"                   (playlist, highest quality, auto-named)'
     exit 1
 }
+
+# A playlist is detected by the URL itself, not by which args were passed
+$isPlaylist = $url -match 'playlist'
 
 if (-not $isPlaylist -and -not $filename) {
     Write-Host 'Usage: ytvideo [resolution] "filename" "URL"'
