@@ -37,9 +37,14 @@ Write-Host "========================================" -ForegroundColor Red
 $adminDir = "C:\Windows\ps1-scripts-win"
 $userDir  = Join-Path $HOME "ps1-scripts-win"
 
+# Resolve the real Documents folder via the Known Folder API, same as
+# install.ps1, so this targets the same profile files the installer wrote
+# to - even if Documents has been redirected to another drive (D:, E:, etc.).
+$documentsPath = [Environment]::GetFolderPath("MyDocuments")
+
 $profilePaths = @(
-    "$HOME\Documents\WindowsPowerShell\Microsoft.PowerShell_profile.ps1",
-    "$HOME\Documents\PowerShell\Microsoft.PowerShell_profile.ps1"
+    (Join-Path $documentsPath "WindowsPowerShell\Microsoft.PowerShell_profile.ps1"),
+    (Join-Path $documentsPath "PowerShell\Microsoft.PowerShell_profile.ps1")
 )
 
 # Dependency list: command to check for, winget package id, display name
