@@ -1,4 +1,4 @@
-$toolkitVersion = "1.2.07"
+$toolkitVersion = "1.2.08"
 Write-Host "ps1-scripts-win Version: $toolkitVersion"
 
 # ================================
@@ -38,9 +38,16 @@ if (-not $admin) {
 # PowerShell Profile Paths
 # -------------------------------
 
+# Resolve the real Documents folder via the Known Folder API rather than
+# assuming "$HOME\Documents". If the user has moved/redirected Documents
+# to another drive (D:, E:, etc.), $HOME\Documents still points at the
+# default C:\ location and silently writes the profile to the wrong
+# (unused) file, while $PROFILE resolves to the real, redirected one.
+$documentsPath = [Environment]::GetFolderPath("MyDocuments")
+
 $profilePaths = @(
-    "$HOME\Documents\WindowsPowerShell\Microsoft.PowerShell_profile.ps1",
-    "$HOME\Documents\PowerShell\Microsoft.PowerShell_profile.ps1"
+    (Join-Path $documentsPath "WindowsPowerShell\Microsoft.PowerShell_profile.ps1"),
+    (Join-Path $documentsPath "PowerShell\Microsoft.PowerShell_profile.ps1")
 )
 
 $scripts = @(
