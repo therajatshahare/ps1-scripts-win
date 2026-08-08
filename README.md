@@ -35,7 +35,7 @@ Install everything with **one command** — no admin required.
 
 ## 🚀 Installation
 
-**1.** Open a PowerShell terminal (version 5.1 or later) and allow local scripts to run:
+**1.** Open a PowerShell terminal (version 7.x or later) and allow local scripts to run:
 ```powershell
 Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
 ```
@@ -231,7 +231,13 @@ irm https://raw.githubusercontent.com/therajatshahare/ps1-scripts-win/main/unins
 ## ⭐ Author
 
 **Rajat Shahare**
-[github.com/therajatshahare](https://github.com/therajatshahare)
+
+[![GitHub](https://img.shields.io/badge/GitHub-therajatshahare-181717?logo=github&logoColor=white)](https://github.com/therajatshahare)
+[![Facebook](https://img.shields.io/badge/Facebook-therajatshahare-1877F2?logo=facebook&logoColor=white)](https://www.facebook.com/therajatshahare)
+[![Twitter](https://img.shields.io/badge/Twitter-therajatshahare-000000?logo=x&logoColor=white)](https://www.x.com/therajatshahare)
+[![Instagram](https://img.shields.io/badge/Instagram-therajatshahare-E4405F?logo=instagram&logoColor=white)](https://www.instagram.com/therajatshahare)
+[![Mastodon](https://img.shields.io/badge/Mastodon-therajatshahare-6364FF?logo=mastodon&logoColor=white)](https://mastodon.social/@therajatshahare)
+[![Pixelfed](https://img.shields.io/badge/Pixelfed-therajatshahare-6C6CE5?logo=pixelfed&logoColor=white)](https://pixelfed.social/therajatshahare)
 
 ---
 
