@@ -8,7 +8,7 @@ Install everything with **one command** — no admin required.
 
 ![Platform](https://img.shields.io/badge/platform-Windows-0078D6?logo=windows&logoColor=white)
 ![PowerShell](https://img.shields.io/badge/PowerShell-5.1%2B-5391FE?logo=powershell&logoColor=white)
-![License](https://img.shields.io/badge/license-Personal%20Use-lightgrey)
+![License](https://img.shields.io/badge/license-MIT-green.svg)
 
 </div>
 
@@ -35,7 +35,7 @@ Install everything with **one command** — no admin required.
 
 ## 🚀 Installation
 
-**1.** Open a PowerShell terminal (version 7.x or later) and allow local scripts to run:
+**1.** Open a PowerShell terminal (version 5.1 or later) and allow local scripts to run:
 ```powershell
 Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
 ```
@@ -243,4 +243,28 @@ irm https://raw.githubusercontent.com/therajatshahare/ps1-scripts-win/main/unins
 
 ## 🛠️ License
 
-Personal toolkit — use freely and modify as needed.
+This project is licensed under the [MIT License](LICENSE) — free to use, modify, and distribute by anyone.
+
+```
+MIT License
+
+Copyright (c) 2025 Rajat Shahare
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+```
