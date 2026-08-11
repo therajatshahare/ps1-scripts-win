@@ -73,26 +73,18 @@ if (!(Test-Path $outputDir)) {
 }
 
 # -------------------------------
-# Resolution mapping (width-based, codec-specific — for vertical video)
+# Format selection (width-based, codec-specific — for vertical video)
 # -------------------------------
-$target = 0
+$format = "bestvideo+bestaudio/best"
+
 switch ($res.ToLower()) {
-    "4k"    { $target = 2160 }
-    "2k"    { $target = 1440 }
-    "1080p" { $target = 1080 }
-    "720p"  { $target = 720 }
-    "480p"  { $target = 480 }
-    "360p"  { $target = 360 }
-    "240p"  { $target = 240 }
-}
-
-$upper = $target + 1
-
-# Format selector: prefer av01, then avc1, then vp9, pinned to exact width
-if ($target -gt 0) {
-    $format = "(bestvideo[vcodec=av01][width>=$target][width<$upper]/bestvideo[vcodec=avc1][width>=$target][width<$upper]/bestvideo[vcodec=vp9][width>=$target][width<$upper])+bestaudio/best"
-} else {
-    $format = "bestvideo+bestaudio/best"
+    "4k"     { $format = "(bestvideo[vcodec=av01][width<=2160][width>=1440]/bestvideo[vcodec=avc1][width<=2160][width>=1440]/bestvideo[vcodec=vp9][width<=2160][width>=1440])+bestaudio/best" }
+    "2k"     { $format = "(bestvideo[vcodec=av01][width<=1440][width>=1080]/bestvideo[vcodec=avc1][width<=1440][width>=1080]/bestvideo[vcodec=vp9][width<=1440][width>=1080])+bestaudio/best" }
+    "1080p"  { $format = "(bestvideo[vcodec=av01][width<=1080][width>=720]/bestvideo[vcodec=avc1][width<=1080][width>=720]/bestvideo[vcodec=vp9][width<=1080][width>=720])+bestaudio/best" }
+    "720p"   { $format = "(bestvideo[vcodec=av01][width<=720][width>=480]/bestvideo[vcodec=avc1][width<=720][width>=480]/bestvideo[vcodec=vp9][width<=720][width>=480])+bestaudio/best" }
+    "480p"   { $format = "(bestvideo[vcodec=av01][width<=480][width>=360]/bestvideo[vcodec=avc1][width<=480][width>=360]/bestvideo[vcodec=vp9][width<=480][width>=360])+bestaudio/best" }
+    "360p"   { $format = "(bestvideo[vcodec=av01][width<=360][width>=240]/bestvideo[vcodec=avc1][width<=360][width>=240]/bestvideo[vcodec=vp9][width<=360][width>=240])+bestaudio/best" }
+    "240p"   { $format = "(bestvideo[vcodec=av01][width<=240]/bestvideo[vcodec=avc1][width<=240]/bestvideo[vcodec=vp9][width<=240])+bestaudio/best" }
 }
 
 # -------------------------------
