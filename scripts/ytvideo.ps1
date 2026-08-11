@@ -4,6 +4,16 @@ param(
     [string]$url
 )
 
+# ===============================
+# ytvideo.ps1
+# Merged from hytvideo.ps1 (horizontal) + vytvideo.ps1 (vertical)
+# Uses YouTube's fixed DASH itag numbers to pick the requested
+# quality tier directly, prioritizing av01 > avc1 > vp9. Itags map
+# to quality tiers consistently regardless of orientation, so this
+# works correctly for vertical AND horizontal videos - including
+# mixed playlists - without any width/height detection at all.
+# ===============================
+
 # -------------------------------
 # Validate yt-dlp
 # -------------------------------
@@ -75,23 +85,49 @@ if (!(Test-Path $outputDir)) {
 # -------------------------------
 # Format selection
 # -------------------------------
-$format = "bestvideo+bestaudio/best"
+# YouTube's DASH itags are a fixed, well-known scheme where each itag
+# represents a quality tier consistently, REGARDLESS of orientation
+# (e.g. itag 137 is always "the 1080p avc1 stream", whether the video
+# is 1080x1920 vertical or 1920x1080 horizontal). So instead of
+# filtering by width/height, we just request the itags directly for
+# the chosen tier, in codec priority order: av01 -> avc1 -> vp9.
+# This sidesteps the vertical/horizontal problem entirely - no
+# orientation detection needed - and also avoids the square-video
+# edge case a width/height filter could hit.
+function Get-FormatChain([string]$res) {
+    $res = $res.ToLower()
 
-switch ($res.ToLower()) {
-    "4k"     { $format = "bestvideo[height<=2160][height>=1440]+bestaudio/best" }
-    "2k"     { $format = "bestvideo[height<=1440][height>=1080]+bestaudio/best" }
-    "1080p"  { $format = "bestvideo[height<=1080][height>=720]+bestaudio/best" }
-    "720p"   { $format = "bestvideo[height<=720][height>=480]+bestaudio/best" }
-    "480p"   { $format = "bestvideo[height<=480][height>=360]+bestaudio/best" }
-    "360p"   { $format = "bestvideo[height<=360][height>=240]+bestaudio/best" }
-    "240p"   { $format = "bestvideo[height<=240]+bestaudio/best" }
+    # av01, avc1, vp9 itags per tier (avc1 has no standard 1440p/2160p
+    # DASH itag on most videos, so those tiers only offer av01/vp9)
+    $itagMap = @{
+        "4k"    = @("401", "313")
+        "2k"    = @("400", "271")
+        "1080p" = @("399", "137", "248")
+        "720p"  = @("398", "136", "247")
+        "480p"  = @("397", "135", "244")
+        "360p"  = @("396", "134", "243")
+        "240p"  = @("395", "133", "242")
+    }
+
+    if (-not $itagMap.ContainsKey($res)) {
+        return "bestvideo+bestaudio/best"
+    }
+
+    $chain = $itagMap[$res] -join "/"
+    # Safety net: if none of the fixed itags exist on this video
+    # (rare/older content that doesn't follow the standard scheme),
+    # fall back to a generic bestvideo+bestaudio before the final
+    # single-file "best" fallback.
+    return "($chain)+bestaudio/bestvideo+bestaudio/best"
 }
 
 # -------------------------------
 # Download
 # -------------------------------
+$format = Get-FormatChain $res
+
 if ($isPlaylist) {
-    Write-Host "Playlist mode: downloading with auto-generated names..."
+    Write-Host "Playlist mode: downloading with auto-generated names (each video's orientation is resolved individually)..."
     yt-dlp -f $format --yes-playlist --merge-output-format mkv `
         --write-subs --sub-lang en --embed-subs --ignore-errors `
         -o "$outputDir\%(playlist_index)02d - %(title)s.%(ext)s" "$url"
