@@ -78,13 +78,13 @@ if (!(Test-Path $outputDir)) {
 $format = "bestvideo+bestaudio/best"
 
 switch ($res.ToLower()) {
-    "4k"     { $format = "(bestvideo[vcodec=av01][width<=2160][width>=1440]/bestvideo[vcodec=avc1][width<=2160][width>=1440]/bestvideo[vcodec=vp9][width<=2160][width>=1440])+bestaudio/best" }
-    "2k"     { $format = "(bestvideo[vcodec=av01][width<=1440][width>=1080]/bestvideo[vcodec=avc1][width<=1440][width>=1080]/bestvideo[vcodec=vp9][width<=1440][width>=1080])+bestaudio/best" }
-    "1080p"  { $format = "(bestvideo[vcodec=av01][width<=1080][width>=720]/bestvideo[vcodec=avc1][width<=1080][width>=720]/bestvideo[vcodec=vp9][width<=1080][width>=720])+bestaudio/best" }
-    "720p"   { $format = "(bestvideo[vcodec=av01][width<=720][width>=480]/bestvideo[vcodec=avc1][width<=720][width>=480]/bestvideo[vcodec=vp9][width<=720][width>=480])+bestaudio/best" }
-    "480p"   { $format = "(bestvideo[vcodec=av01][width<=480][width>=360]/bestvideo[vcodec=avc1][width<=480][width>=360]/bestvideo[vcodec=vp9][width<=480][width>=360])+bestaudio/best" }
-    "360p"   { $format = "(bestvideo[vcodec=av01][width<=360][width>=240]/bestvideo[vcodec=avc1][width<=360][width>=240]/bestvideo[vcodec=vp9][width<=360][width>=240])+bestaudio/best" }
-    "240p"   { $format = "(bestvideo[vcodec=av01][width<=240]/bestvideo[vcodec=avc1][width<=240]/bestvideo[vcodec=vp9][width<=240])+bestaudio/best" }
+    "4k"     { $format = "(bestvideo[vcodec=av01][width<=2160][width>=1440]/bestvideo[vcodec=avc1][width<=2160][width>=1440]/bestvideo[vcodec=vp9][width<=2160][width>=1440])+bestaudio/bestvideo+bestaudio/best" }
+    "2k"     { $format = "(bestvideo[vcodec=av01][width<=1440][width>=1080]/bestvideo[vcodec=avc1][width<=1440][width>=1080]/bestvideo[vcodec=vp9][width<=1440][width>=1080])+bestaudio/bestvideo+bestaudio/best" }
+    "1080p"  { $format = "(bestvideo[vcodec=av01][width<=1080][width>=720]/bestvideo[vcodec=avc1][width<=1080][width>=720]/bestvideo[vcodec=vp9][width<=1080][width>=720])+bestaudio/bestvideo+bestaudio/best" }
+    "720p"   { $format = "(bestvideo[vcodec=av01][width<=720][width>=480]/bestvideo[vcodec=avc1][width<=720][width>=480]/bestvideo[vcodec=vp9][width<=720][width>=480])+bestaudio/bestvideo+bestaudio/best" }
+    "480p"   { $format = "(bestvideo[vcodec=av01][width<=480][width>=360]/bestvideo[vcodec=avc1][width<=480][width>=360]/bestvideo[vcodec=vp9][width<=480][width>=360])+bestaudio/bestvideo+bestaudio/best" }
+    "360p"   { $format = "(bestvideo[vcodec=av01][width<=360][width>=240]/bestvideo[vcodec=avc1][width<=360][width>=240]/bestvideo[vcodec=vp9][width<=360][width>=240])+bestaudio/bestvideo+bestaudio/best" }
+    "240p"   { $format = "(bestvideo[vcodec=av01][width<=240]/bestvideo[vcodec=avc1][width<=240]/bestvideo[vcodec=vp9][width<=240])+bestaudio/bestvideo+bestaudio/best" }
 }
 
 # -------------------------------
