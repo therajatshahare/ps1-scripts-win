@@ -18,6 +18,7 @@ if (-not $Command) {
     Write-Host "`nMedia Commands" -ForegroundColor Yellow
     Write-Host "  ytvideo    -> Download YouTube video"
     Write-Host "  vytvideo   -> Download vertical video"
+    Write-Host "  hytvideo   -> Download horizontal video"
     Write-Host "  ytaudio    -> Extract audio"
 
     Write-Host "`nMetadata & Lyrics" -ForegroundColor Yellow
@@ -64,13 +65,14 @@ switch ($Command.ToLower()) {
         Write-Host "  original, 4k, 2k, 1080p, 720p, 480p, 360p, 240p"
         Write-Host ""
         Write-Host "Notes:"
-        Write-Host "  - No resolution = best/original quality"
-        Write-Host "  - Output format: MKV"
+        Write-Host "  - original = best/original quality"
+        Write-Host "  - auto detect the video orientation"
+        Write-Host "  - output format: MKV"
     }
 
     "vytvideo" {
         Write-Host "vytvideo [res] ""name"" ""url""" -ForegroundColor Cyan
-        Write-Host "Download vertical videos (Reels/Shorts)"
+        Write-Host "Download vertical videos (for...Reels/Shorts)"
         Write-Host ""
         Write-Host "Example:"
         Write-Host "  vytvideo 2k ""video"" ""https://youtu.be/..."""
@@ -82,7 +84,7 @@ switch ($Command.ToLower()) {
 
     "hytvideo" {
         Write-Host "hytvideo [res] ""name"" ""url""" -ForegroundColor Cyan
-        Write-Host "Download horizontal videos (Reels/Shorts)"
+        Write-Host "Download horizontal videos (for...TV/Normal Video)"
         Write-Host ""
         Write-Host "Example:"
         Write-Host "  hytvideo 2k ""video"" ""https://youtu.be/..."""
