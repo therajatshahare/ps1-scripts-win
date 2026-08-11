@@ -53,6 +53,7 @@ $profilePaths = @(
 $scripts = @(
     "ytvideo.ps1",
     "vytvideo.ps1",
+    "hytvideo.ps1",
     "ytaudio.ps1",
     "showmeta.ps1",
     "showlyrics.ps1",
