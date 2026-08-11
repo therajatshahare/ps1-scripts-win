@@ -61,7 +61,7 @@ switch ($Command.ToLower()) {
         Write-Host "  ytvideo 2k ""video"" ""https://youtu.be/..."""
         Write-Host ""
         Write-Host "Resolutions:"
-        Write-Host "  4k, 2k, 1080p, 720p, 480p, 360p, 240p"
+        Write-Host "  original, 4k, 2k, 1080p, 720p, 480p, 360p, 240p"
         Write-Host ""
         Write-Host "Notes:"
         Write-Host "  - No resolution = best/original quality"
@@ -74,6 +74,18 @@ switch ($Command.ToLower()) {
         Write-Host ""
         Write-Host "Example:"
         Write-Host "  vytvideo 2k ""video"" ""https://youtu.be/..."""
+        Write-Host ""
+        Write-Host "Notes:"
+        Write-Host "  - Uses same resolution options as ytvideo"
+        Write-Host "  - Output format: MKV"
+    }
+
+    "hytvideo" {
+        Write-Host "hytvideo [res] ""name"" ""url""" -ForegroundColor Cyan
+        Write-Host "Download horizontal videos (Reels/Shorts)"
+        Write-Host ""
+        Write-Host "Example:"
+        Write-Host "  hytvideo 2k ""video"" ""https://youtu.be/..."""
         Write-Host ""
         Write-Host "Notes:"
         Write-Host "  - Uses same resolution options as ytvideo"
