@@ -78,13 +78,13 @@ if (!(Test-Path $outputDir)) {
 $format = "bestvideo+bestaudio/best"
 
 switch ($res.ToLower()) {
-    "4k"     { $format = "bestvideo[height<=2160][height>=1440]+bestaudio/best" }
-    "2k"     { $format = "bestvideo[height<=1440][height>=1080]+bestaudio/best" }
-    "1080p"  { $format = "bestvideo[height<=1080][height>=720]+bestaudio/best" }
-    "720p"   { $format = "bestvideo[height<=720][height>=480]+bestaudio/best" }
-    "480p"   { $format = "bestvideo[height<=480][height>=360]+bestaudio/best" }
-    "360p"   { $format = "bestvideo[height<=360][height>=240]+bestaudio/best" }
-    "240p"   { $format = "bestvideo[height<=240]+bestaudio/best" }
+    "4k"     { $format = "bestvideo[height<=2160][height>=1440]+bestaudio/bestvideo+bestaudio/best" }
+    "2k"     { $format = "bestvideo[height<=1440][height>=1080]+bestaudio/bestvideo+bestaudio/best" }
+    "1080p"  { $format = "bestvideo[height<=1080][height>=720]+bestaudio/bestvideo+bestaudio/best" }
+    "720p"   { $format = "bestvideo[height<=720][height>=480]+bestaudio/bestvideo+bestaudio/best" }
+    "480p"   { $format = "bestvideo[height<=480][height>=360]+bestaudio/bestvideo+bestaudio/best" }
+    "360p"   { $format = "bestvideo[height<=360][height>=240]+bestaudio/bestvideo+bestaudio/best" }
+    "240p"   { $format = "bestvideo[height<=240]+bestaudio/bestvideo+bestaudio/best" }
 }
 
 # -------------------------------
