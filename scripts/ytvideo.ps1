@@ -122,31 +122,133 @@ function Get-FormatChain([string]$res) {
 }
 
 # -------------------------------
+# Cookie / bot-check handling
+# -------------------------------
+# Cookie args are kept in script scope so that once the user opts in,
+# every later yt-dlp call in this run (subtitle re-check, retry, each
+# playlist attempt) reuses the same browser without asking again.
+$script:cookieArgs = @()
+
+# Errors that mean "YouTube wants authentication", not "the video is broken"
+function Test-NeedsCookies([string]$text) {
+    if (-not $text) { return $false }
+    return (
+        $text -match "Sign in to confirm you" -or
+        $text -match "confirm you.{0,3}re not a bot" -or
+        $text -match "HTTP Error 429" -or
+        $text -match "Too Many Requests" -or
+        $text -match "Use --cookies-from-browser" -or
+        $text -match "This video is only available to Music Premium members" -or
+        $text -match "Please sign in"
+    )
+}
+
+# Ask the user whether to retry with browser cookies, and which browser.
+# Returns $true if cookies were enabled.
+function Request-Cookies {
+    if ($script:cookieArgs.Count -gt 0) { return $true }   # already enabled
+
+    Write-Host ""
+    Write-Host "YouTube blocked that request (bot check / rate limit)." -ForegroundColor Yellow
+    $answer = Read-Host "Would you like to retry using cookies from your browser? (y/n)"
+
+    if ($answer -notmatch '^(y|yes)$') {
+        Write-Host "Continuing without cookies." -ForegroundColor Yellow
+        return $false
+    }
+
+    $browser = Read-Host "Which browser? (firefox/chrome/edge/brave/opera/vivaldi/chromium) [firefox]"
+    if ([string]::IsNullOrWhiteSpace($browser)) { $browser = "firefox" }
+    $browser = $browser.Trim().ToLower()
+
+    $script:cookieArgs = @("--cookies-from-browser", $browser)
+    Write-Host "Retrying with cookies from $browser..." -ForegroundColor Cyan
+    Add-Content "yt-dlp-log.txt" "[$(Get-Date)] Enabled --cookies-from-browser $browser for: $url"
+    return $true
+}
+
+# Run yt-dlp with the current cookie args, echoing output live while also
+# capturing it so we can inspect it for auth errors afterwards.
+# Returns a hashtable: @{ Success = bool; Output = string }
+function Invoke-YtDlp([string[]]$Arguments) {
+    $allArgs = @()
+    if ($script:cookieArgs.Count -gt 0) { $allArgs += $script:cookieArgs }
+    $allArgs += $Arguments
+
+    # --newline keeps the progress readable: yt-dlp normally redraws one
+    # line with carriage returns, which turns to mush once piped.
+    $captured = & yt-dlp --newline @allArgs 2>&1 | ForEach-Object {
+        Write-Host $_
+        $_
+    }
+    $ok = ($LASTEXITCODE -eq 0)
+
+    return @{ Success = $ok; Output = ($captured -join "`n") }
+}
+
+# -------------------------------
 # Download
 # -------------------------------
 $format = Get-FormatChain $res
 
-if ($isPlaylist) {
-    Write-Host "Playlist mode: downloading with auto-generated names (each video's orientation is resolved individually)..."
-    yt-dlp -f $format --yes-playlist --merge-output-format mkv `
-        --write-subs --sub-lang en --embed-subs --ignore-errors `
-        -o "$outputDir\%(playlist_index)02d - %(title)s.%(ext)s" "$url"
+# Build the yt-dlp argument list for the current mode.
+# Subtitle detection is re-run on retry, because the first check may
+# itself have been blocked (silently reporting "no subtitles").
+function Get-DownloadArgs {
+    if ($isPlaylist) {
+        Write-Host "Playlist mode: downloading with auto-generated names (each video's orientation is resolved individually)..."
+        return @(
+            "-f", $format, "--yes-playlist", "--merge-output-format", "mkv",
+            "--write-subs", "--sub-lang", "en", "--embed-subs", "--ignore-errors",
+            "-o", "$outputDir\%(playlist_index)02d - %(title)s.%(ext)s", $url
+        )
+    }
 
-    Add-Content "yt-dlp-log.txt" "[$(Get-Date)] Downloaded playlist: $url"
-} else {
-    # Subtitle detection (single video only)
-    $subs = yt-dlp --list-subs "$url" 2>$null
-    $hasRealSub = $subs -match '^en ' -and $subs -notmatch 'auto-generated'
+    $subsArgs = @()
+    if ($script:cookieArgs.Count -gt 0) { $subsArgs += $script:cookieArgs }
+    $subsArgs += @("--list-subs", $url)
+    $subs = (& yt-dlp @subsArgs 2>$null) -join "`n"
+    $hasRealSub = $subs -match '(?m)^en ' -and $subs -notmatch 'auto-generated'
 
     if ($hasRealSub) {
         Write-Host "Real English subtitles found. Downloading with subtitles..."
-        yt-dlp -f $format --merge-output-format mkv --sub-lang en --write-subs --embed-subs `
-            -o "$outputDir\$filename.mkv" "$url"
-    } else {
-        Write-Host "No real English subtitles found. Downloading without subtitles..."
-        yt-dlp -f $format --merge-output-format mkv `
-            -o "$outputDir\$filename.mkv" "$url"
+        return @(
+            "-f", $format, "--merge-output-format", "mkv",
+            "--sub-lang", "en", "--write-subs", "--embed-subs",
+            "-o", "$outputDir\$filename.mkv", $url
+        )
     }
 
+    Write-Host "No real English subtitles found. Downloading without subtitles..."
+    return @(
+        "-f", $format, "--merge-output-format", "mkv",
+        "-o", "$outputDir\$filename.mkv", $url
+    )
+}
+
+$result = Invoke-YtDlp (Get-DownloadArgs)
+
+# If it failed because YouTube wants auth, offer to retry with cookies
+if (-not $result.Success -and (Test-NeedsCookies $result.Output)) {
+    if (Request-Cookies) {
+        $result = Invoke-YtDlp (Get-DownloadArgs)
+    }
+}
+
+if ($isPlaylist) {
+    Add-Content "yt-dlp-log.txt" "[$(Get-Date)] Downloaded playlist: $url"
+} else {
     Add-Content "yt-dlp-log.txt" "[$(Get-Date)] Downloading $url as $filename.mkv"
+}
+
+if (-not $result.Success) {
+    Write-Host ""
+    Write-Host "Download failed." -ForegroundColor Red
+    if (Test-NeedsCookies $result.Output) {
+        Write-Host "YouTube is still refusing the request. Things to try:" -ForegroundColor Yellow
+        Write-Host "  - Make sure you're signed in to YouTube in the browser you picked"
+        Write-Host "  - Close that browser fully (it can lock its cookie database), then retry"
+        Write-Host "  - Wait a while if you've been rate-limited (HTTP 429)"
+    }
+    exit 1
 }
