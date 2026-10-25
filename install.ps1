@@ -1,4 +1,4 @@
-$toolkitVersion = "1.2.09"
+$toolkitVersion = "1.2.10"
 Write-Host "ps1-scripts-win Version: $toolkitVersion"
 
 # ================================
@@ -6,6 +6,10 @@ Write-Host "ps1-scripts-win Version: $toolkitVersion"
 # ================================
 
 $ErrorActionPreference = "Stop"
+
+# Older Windows builds (and fresh LTSC images) can default to TLS 1.0/1.1,
+# which GitHub, python.org and the PowerShell Gallery refuse. Force TLS 1.2.
+[Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
 
 Write-Host "╔══════════════════════════════════════╗" -ForegroundColor Green
 Write-Host "║            ps1-scripts-win           ║" -ForegroundColor Green
@@ -33,6 +37,10 @@ if (-not $admin) {
     Write-Host "⚠ Not running as Administrator. Switching to user directory..." -ForegroundColor Yellow
     $targetDir = Join-Path $HOME "ps1-scripts-win"
 }
+
+# Portable tools (git, ffmpeg, aria2, ...) that are unpacked instead of installed
+$toolsDir = Join-Path $targetDir "tools"
+$binDir   = Join-Path $toolsDir "bin"
 
 # -------------------------------
 # PowerShell Profile Paths
@@ -73,6 +81,187 @@ $scripts = @(
 )
 
 # -------------------------------
+# HELPERS
+# -------------------------------
+function Get-File {
+    param([string]$Url, [string]$OutFile)
+    # PS 5.1 draws a very slow progress bar during downloads. Silence it for
+    # this call only and restore the user's setting afterwards.
+    $prev = $ProgressPreference
+    $ProgressPreference = 'SilentlyContinue'
+    try {
+        Invoke-WebRequest -Uri $Url -OutFile $OutFile -UseBasicParsing
+    } finally {
+        $ProgressPreference = $prev
+    }
+}
+
+function Get-GitHubAssetUrl {
+    # Returns the download URL of the latest release asset whose file name
+    # matches $Pattern (regex). Returns $null if nothing matches or GitHub
+    # can't be reached.
+    param([string]$Repo, [string]$Pattern)
+    try {
+        $rel = Invoke-RestMethod -Uri "https://api.github.com/repos/$Repo/releases/latest" -UserAgent "ps1-scripts-win-installer"
+        $asset = $rel.assets | Where-Object { $_.name -match $Pattern } | Select-Object -First 1
+        if ($asset) { return $asset.browser_download_url }
+    } catch {
+        Write-Host "  GitHub lookup failed for $Repo : $($_.Exception.Message)" -ForegroundColor DarkGray
+    }
+    return $null
+}
+
+function Expand-ToolZip {
+    # Downloads a zip, unpacks it to $toolsDir\<Name>, locates <Exe> inside
+    # (archives often wrap files in a versioned folder) and adds its folder
+    # to the user PATH.
+    param([string]$Name, [string]$Url, [string]$Exe)
+    $zip  = Join-Path $env:TEMP "$Name.zip"
+    $dest = Join-Path $toolsDir $Name
+
+    Get-File -Url $Url -OutFile $zip
+    Expand-Archive -Path $zip -DestinationPath $dest -Force
+    Remove-Item $zip -ErrorAction SilentlyContinue
+
+    $hit = Get-ChildItem -Path $dest -Recurse -Filter $Exe -File -ErrorAction SilentlyContinue | Select-Object -First 1
+    if (-not $hit) { throw "$Exe was not found inside the $Name archive." }
+
+    Add-ToUserPath $hit.DirectoryName
+}
+
+function Test-RealCommand {
+    param([string]$CmdName)
+    $c = Get-Command $CmdName -ErrorAction SilentlyContinue
+    if (-not $c) { return $false }
+
+    if ($c.Source -and $c.Source -like "*\WindowsApps\*") {
+        # WindowsApps can hold either a real Store-installed interpreter
+        # (works fine) or an empty "app execution alias" stub that just
+        # opens the Microsoft Store when run. Path alone can't tell them
+        # apart, so actually try running it and check for real output.
+        try {
+            $out = & $CmdName --version 2>&1
+            if ($LASTEXITCODE -eq 0 -and $out -match '\d+\.\d+(\.\d+)?') {
+                return $true
+            }
+        } catch {}
+        return $false
+    }
+
+    return $true
+}
+
+function Add-ToUserPath {
+    param([string]$Dir)
+
+    if (-not $Dir) { return }
+
+    $currentPath = [Environment]::GetEnvironmentVariable("Path", "User")
+    $pathParts = $currentPath -split ';' | Where-Object { $_ -ne "" }
+
+    if ($pathParts -notcontains $Dir) {
+        $newPath = ($pathParts + $Dir) -join ';'
+        [Environment]::SetEnvironmentVariable("Path", $newPath, "User")
+        Write-Host "✔ Added to PATH: $Dir" -ForegroundColor Green
+    }
+
+    if (($env:PATH -split ';') -notcontains $Dir) {
+        $env:PATH = "$env:PATH;$Dir"
+    }
+}
+
+function Update-SessionPath {
+    # Installers update the registry PATH, but this session keeps its old copy.
+    # Merge the registry Machine + User PATH into the current one, no duplicates.
+    $machine = [Environment]::GetEnvironmentVariable("Path", "Machine")
+    $user    = [Environment]::GetEnvironmentVariable("Path", "User")
+
+    $parts = New-Object System.Collections.Generic.List[string]
+    foreach ($p in ((@($env:PATH, $machine, $user) -join ';') -split ';')) {
+        if ($p -and -not $parts.Contains($p)) { $parts.Add($p) }
+    }
+    $env:PATH = $parts -join ';'
+}
+
+function Repair-WinGetPackagePath {
+    # Some winget packages are portable ZIP extracts. winget reports them as
+    # installed, but never adds their folder to PATH. Search winget's package
+    # cache for the exe and add its folder to PATH.
+    param([string]$Cmd, [string]$WingetName)
+
+    $packagesRoot = "$env:LOCALAPPDATA\Microsoft\WinGet\Packages"
+    if (-not (Test-Path $packagesRoot)) { return $false }
+
+    $exeName = "$Cmd.exe"
+    $match = Get-ChildItem "$packagesRoot\$WingetName*" -Recurse -Filter $exeName -ErrorAction SilentlyContinue |
+        Select-Object -First 1
+
+    if ($match) {
+        Add-ToUserPath $match.DirectoryName
+        return (Test-RealCommand $Cmd)
+    }
+
+    return $false
+}
+
+function Install-Tool {
+    # Installs one command-line tool. Order of attempts:
+    #   1. already on PATH                  -> done
+    #   2. winget, if this machine has it   (usually NOT on LTSC)
+    #   3. direct-download function $Fallback
+    param(
+        [string]$Cmd,
+        [string]$WingetId,
+        [string]$Fallback
+    )
+
+    if (Test-RealCommand $Cmd) {
+        Write-Host "$Cmd already installed"
+        return
+    }
+
+    if (Get-Command winget -ErrorAction SilentlyContinue) {
+        Write-Host "Installing $Cmd via winget..."
+        winget install --id $WingetId -e --silent --accept-package-agreements --accept-source-agreements
+        $exitCode = $LASTEXITCODE
+
+        # -1978335189 (0x8A15002B) = already installed and up to date
+        if ($exitCode -eq 0 -or $exitCode -eq -1978335189) {
+            if (Test-RealCommand $Cmd) {
+                Write-Host "✔ $Cmd ready (winget)" -ForegroundColor Green
+                return
+            }
+            if (Repair-WinGetPackagePath -Cmd $Cmd -WingetName $WingetId) {
+                Write-Host "✔ $Cmd ready (winget, PATH repaired)" -ForegroundColor Green
+                return
+            }
+        }
+        Write-Host "winget did not install $Cmd (exit code $exitCode). Trying direct download..." -ForegroundColor Yellow
+    } else {
+        Write-Host "winget not found, installing $Cmd directly..." -ForegroundColor DarkGray
+    }
+
+    if (-not $Fallback) {
+        Write-Host "✖ No direct-download method for $Cmd" -ForegroundColor Red
+        return
+    }
+
+    try {
+        & $Fallback
+    } catch {
+        Write-Host "✖ Direct install of $Cmd failed" -ForegroundColor Red
+        Write-Host "  $($_.Exception.Message)" -ForegroundColor DarkGray
+    }
+
+    Update-SessionPath
+    if (Test-RealCommand $Cmd) {
+        Write-Host "✔ $Cmd installed" -ForegroundColor Green
+    } else {
+        Write-Host "⚠ $Cmd still not found. Restart PowerShell and run update-scripts to retry." -ForegroundColor Yellow
+    }
+}
+
+# -------------------------------
 # CREATE TARGET DIRECTORY
 # -------------------------------
 if (!(Test-Path $targetDir)) {
@@ -92,7 +281,7 @@ foreach ($script in $scripts) {
     $out = Join-Path $targetDir $script
 
     try {
-        Invoke-WebRequest -Uri $url -OutFile $out -UseBasicParsing
+        Get-File -Url $url -OutFile $out
         Write-Host "✔ $script"
     } catch {
         Write-Host "✖ Failed: $script" -ForegroundColor Red
@@ -303,186 +492,84 @@ try {
 }
 
 # -------------------------------
-# DEPENDENCIES
+# DEPENDENCIES - direct-download fallbacks
 # -------------------------------
 Write-Host "`nInstalling dependencies..." -ForegroundColor Cyan
 
-function Test-RealCommand {
-    param([string]$CmdName)
-    $c = Get-Command $CmdName -ErrorAction SilentlyContinue
-    if (-not $c) { return $false }
+# Portable single-file tools (yt-dlp) live in $binDir, which goes on PATH once
+Add-ToUserPath $binDir
 
-    if ($c.Source -and $c.Source -like "*\WindowsApps\*") {
-        # WindowsApps can hold either a real Store-installed interpreter
-        # (works fine) or an empty "app execution alias" stub that just
-        # opens the Microsoft Store when run. Path alone can't tell them
-        # apart, so actually try running it and check for real output.
-        try {
-            $out = & $CmdName --version 2>&1
-            if ($LASTEXITCODE -eq 0 -and $out -match '\d+\.\d+(\.\d+)?') {
-                return $true
-            }
-        } catch {}
-        return $false
-    }
+function Install-GitDirect {
+    # PortableGit is a self-extracting 7z archive: no installer, no admin needed.
+    $url = Get-GitHubAssetUrl -Repo "git-for-windows/git" -Pattern '^PortableGit-[\d.]+-64-bit\.7z\.exe$'
+    if (-not $url) { throw "Could not find PortableGit on GitHub (GitHub blocked or rate-limited?)." }
 
-    return $true
+    $exe  = Join-Path $env:TEMP "PortableGit.7z.exe"
+    $dest = Join-Path $toolsDir "git"
+
+    Get-File -Url $url -OutFile $exe
+    Start-Process -FilePath $exe -ArgumentList "-y", "-o`"$dest`"" -Wait
+    Remove-Item $exe -ErrorAction SilentlyContinue
+
+    if (-not (Test-Path (Join-Path $dest "cmd\git.exe"))) { throw "PortableGit extraction failed." }
+    Add-ToUserPath (Join-Path $dest "cmd")
 }
 
-function Add-ToUserPath {
-    param([string]$Dir)
-
-    if (-not $Dir) { return }
-
-    $currentPath = [Environment]::GetEnvironmentVariable("Path", "User")
-    $pathParts = $currentPath -split ';' | Where-Object { $_ -ne "" }
-
-    if ($pathParts -notcontains $Dir) {
-        $newPath = ($pathParts + $Dir) -join ';'
-        [Environment]::SetEnvironmentVariable("Path", $newPath, "User")
-        Write-Host "✔ Added to PATH: $Dir" -ForegroundColor Green
-    }
-
-    if (($env:PATH -split ';') -notcontains $Dir) {
-        $env:PATH = "$env:PATH;$Dir"
-    }
+function Install-YtDlpDirect {
+    New-Item -ItemType Directory -Path $binDir -Force | Out-Null
+    Get-File -Url "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp.exe" `
+             -OutFile (Join-Path $binDir "yt-dlp.exe")
 }
 
-function Repair-WinGetPackagePath {
-    # Some winget packages are portable ZIP extracts rather than proper
-    # installers (aria2 is one) - winget shows them as "installed" and
-    # unpacks them under its own Packages folder, but never registers
-    # that folder in PATH. If Test-RealCommand still can't find the exe
-    # after a successful winget install, search for it under winget's
-    # package cache and add its folder to PATH directly. The subfolder
-    # name includes the version, so this is done by search, not by a
-    # hardcoded path, and keeps working across version upgrades.
-    param(
-        [string]$Cmd,
-        [string]$WingetName
-    )
+function Install-FfmpegDirect {
+    # Gyan.dev "essentials" build, the same build the winget package ships
+    Expand-ToolZip -Name "ffmpeg" `
+                   -Url "https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip" `
+                   -Exe "ffmpeg.exe"
+}
 
-    $packagesRoot = "$env:LOCALAPPDATA\Microsoft\WinGet\Packages"
-    if (-not (Test-Path $packagesRoot)) { return $false }
+function Install-Aria2Direct {
+    $url = Get-GitHubAssetUrl -Repo "aria2/aria2" -Pattern '^aria2-[\d.]+-win-64bit-build\d+\.zip$'
+    if (-not $url) { throw "No Windows build of aria2 found on GitHub." }
+    Expand-ToolZip -Name "aria2" -Url $url -Exe "aria2c.exe"
+}
 
-    $exeName = "$Cmd.exe"
-    $match = Get-ChildItem "$packagesRoot\$WingetName*" -Recurse -Filter $exeName -ErrorAction SilentlyContinue |
+function Install-FastfetchDirect {
+    $url = Get-GitHubAssetUrl -Repo "fastfetch-cli/fastfetch" -Pattern '^fastfetch-windows-amd64\.zip$'
+    if (-not $url) { throw "No Windows build of fastfetch found on GitHub." }
+    Expand-ToolZip -Name "fastfetch" -Url $url -Exe "fastfetch.exe"
+}
+
+function Install-ExiftoolDirect {
+    # exiftool.org links the newest Windows zip from its front page
+    $page = Invoke-WebRequest -Uri "https://exiftool.org/" -UseBasicParsing
+    $m = [regex]::Match($page.Content, 'exiftool-[\d.]+_64\.zip')
+    if (-not $m.Success) { throw "Could not find the ExifTool Windows download on exiftool.org." }
+
+    $zip  = Join-Path $env:TEMP "exiftool.zip"
+    $dest = Join-Path $toolsDir "exiftool"
+
+    Get-File -Url ("https://exiftool.org/" + $m.Value) -OutFile $zip
+    Expand-Archive -Path $zip -DestinationPath $dest -Force
+    Remove-Item $zip -ErrorAction SilentlyContinue
+
+    # The zip ships "exiftool(-k).exe"; the toolkit calls plain "exiftool"
+    $exe = Get-ChildItem -Path $dest -Recurse -Filter "exiftool*.exe" -File |
+        Where-Object { $_.Name -match '^exiftool(\(-k\))?\.exe$' } |
         Select-Object -First 1
+    if (-not $exe) { throw "exiftool.exe was not found inside the archive." }
 
-    if ($match) {
-        Add-ToUserPath $match.DirectoryName
-        return (Test-RealCommand $Cmd)
+    if ($exe.Name -ne "exiftool.exe") {
+        Rename-Item -Path $exe.FullName -NewName "exiftool.exe"
     }
-
-    return $false
+    Add-ToUserPath $exe.DirectoryName
 }
 
-function Install-IfMissing {
-    param(
-        [string]$cmd,
-        [string]$wingetName
-    )
-
-    # Windows ships a fake python.exe / python3.exe under WindowsApps (the "App
-    # execution alias") that Get-Command always finds even when real Python is
-    # not installed - it just opens the Microsoft Store if run. Treat that as
-    # "missing" so we don't skip a real install.
-    if (!(Test-RealCommand $cmd)) {
-        if (Get-Command winget -ErrorAction SilentlyContinue) {
-            Write-Host "Installing $cmd..."
-            winget install --id $wingetName -e --silent --accept-package-agreements --accept-source-agreements
-            $exitCode = $LASTEXITCODE
-
-            # -1978335189 (0x8A15002B) is winget's "no applicable update found",
-            # which winget returns when the package is already installed and
-            # up to date - not a real failure. Anything else genuinely failed.
-            if ($exitCode -ne 0 -and $exitCode -ne -1978335189) {
-                Write-Host "✖ Failed to install $cmd using winget (exit code $exitCode)" -ForegroundColor Yellow
-                return
-            }
-
-            if (!(Test-RealCommand $cmd)) {
-                # Installed (or already present) but not on PATH - likely a
-                # portable/ZIP-style winget package. Try to locate and fix it.
-                if (Repair-WinGetPackagePath -Cmd $cmd -WingetName $wingetName) {
-                    Write-Host "✔ $cmd found and added to PATH" -ForegroundColor Green
-                } else {
-                    Write-Host "⚠ $cmd installed but not found on PATH. You may need to restart PowerShell or add it to PATH manually." -ForegroundColor Yellow
-                }
-            }
-        } else {
-            Write-Host "winget not found. Please install $cmd manually." -ForegroundColor Yellow
-        }
-    } else {
-        Write-Host "$cmd already installed"
-    }
-}
-
-function Update-SessionPath {
-    # Installers (winget or the .exe fallback below) update the registry's
-    # Machine/User PATH, but the *current* PowerShell session keeps its own
-    # cached copy of $env:PATH from when it started. Without this, a freshly
-    # installed tool won't be found until you close and reopen PowerShell.
-    $machinePath = [Environment]::GetEnvironmentVariable("Path", "Machine")
-    $userPath    = [Environment]::GetEnvironmentVariable("Path", "User")
-    $env:PATH = @($machinePath, $userPath) -join ';'
-}
-
-function Install-Python {
-    if (Test-RealCommand "python") {
-        Write-Host "python already installed"
-        return
-    }
-
-    $installed = $false
-
-    if (Get-Command winget -ErrorAction SilentlyContinue) {
-        Write-Host "Installing python..."
-
-        # "No package found matching input criteria" for a package ID that
-        # definitely exists (Python.Python.3) almost always means winget's
-        # local source index is stale, not that the package is missing.
-        # Refreshing it first fixes this in most cases.
-        try { winget source update | Out-Null } catch {}
-
-        winget install --id Python.Python.3 -e --source winget --silent --accept-package-agreements --accept-source-agreements
-        if ($LASTEXITCODE -eq 0) {
-            $installed = $true
-            Write-Host "✔ python installed via winget" -ForegroundColor Green
-        } else {
-            Write-Host "✖ winget install of python failed (exit code $LASTEXITCODE)" -ForegroundColor Yellow
-        }
-    } else {
-        Write-Host "winget not found." -ForegroundColor Yellow
-    }
-
-    if (-not $installed) {
-        # Fallback so setup doesn't depend on winget's index being healthy:
-        # grab the official installer straight from python.org and run it
-        # silently. This also covers machines without winget at all.
-        Write-Host "Falling back to a direct download from python.org..." -ForegroundColor Cyan
-        try {
-            $installerUrl  = "https://www.python.org/ftp/python/3.13.5/python-3.13.5-amd64.exe"
-            $installerPath = Join-Path $env:TEMP "python-installer.exe"
-
-            Invoke-WebRequest -Uri $installerUrl -OutFile $installerPath -UseBasicParsing
-            Start-Process -FilePath $installerPath `
-                -ArgumentList "/quiet InstallAllUsers=0 PrependPath=1 Include_launcher=0" `
-                -Wait
-            Remove-Item $installerPath -ErrorAction SilentlyContinue
-
-            $installed = $true
-            Write-Host "✔ python installed via direct download" -ForegroundColor Green
-        } catch {
-            Write-Host "✖ Failed to install python via direct download" -ForegroundColor Red
-            Write-Host "  $($_.Exception.Message)" -ForegroundColor DarkGray
-            Write-Host "  Please install it manually from https://www.python.org/downloads/" -ForegroundColor Yellow
-        }
-    }
-
-    if ($installed) {
-        Update-SessionPath
-    }
+function Install-PwshDirect {
+    # Portable zip: no MSI, no admin needed
+    $url = Get-GitHubAssetUrl -Repo "PowerShell/PowerShell" -Pattern '^PowerShell-[\d.]+-win-x64\.zip$'
+    if (-not $url) { throw "Could not find the PowerShell 7 zip on GitHub." }
+    Expand-ToolZip -Name "pwsh" -Url $url -Exe "pwsh.exe"
 }
 
 function Install-Scoop {
@@ -492,18 +579,12 @@ function Install-Scoop {
     }
 
     if ($admin) {
-        # Scoop's official installer refuses to run under an elevated session
-        # by design - it's meant to be a per-user tool with no admin
-        # dependency, so it silently bails rather than install as admin.
+        # Scoop's official installer refuses to run elevated by design.
         Write-Host "✖ Skipping scoop - it cannot be installed from an Administrator session." -ForegroundColor Yellow
-        Write-Host "  This is intentional on Scoop's part, not a bug here." -ForegroundColor DarkGray
         Write-Host "  Re-run this installer from a normal (non-Administrator) PowerShell window to get scoop." -ForegroundColor DarkGray
         return
     }
 
-    # Scoop is not reliably published on winget (its manifest submission was
-    # never accepted into winget-pkgs), so it must be installed via its own
-    # official bootstrap script instead of "winget install".
     Write-Host "Installing scoop..."
     try {
         Set-ExecutionPolicy RemoteSigned -Scope CurrentUser -Force
@@ -515,94 +596,106 @@ function Install-Scoop {
 }
 
 function Install-Aria2 {
-    # aria2's winget package (aria2.aria2) is a portable ZIP extract, not a
-    # real installer - winget marks it "installed" but never registers its
-    # folder in PATH, and that folder's name changes on every version bump.
-    # Scoop, on the other hand, is built exactly for portable apps: it adds
-    # one shims folder to PATH once and repoints a "current" symlink per app
-    # on every update, so aria2c keeps working across upgrades with no
-    # extra repair step. Prefer scoop when it's available; fall back to
-    # winget (with PATH repair) only when scoop isn't usable, e.g. an
-    # Administrator session, where Install-Scoop above intentionally skips.
-    if (Get-Command scoop -ErrorAction SilentlyContinue) {
-        if (Get-Command aria2c -ErrorAction SilentlyContinue) {
-            Write-Host "aria2c already installed"
-        } else {
-            Write-Host "Installing aria2c via scoop..."
-            try {
-                scoop install aria2
-            } catch {
-                Write-Host "✖ Failed to install aria2c via scoop" -ForegroundColor Yellow
-                Write-Host "  $($_.Exception.Message)" -ForegroundColor DarkGray
-            }
-        }
-    } else {
-        Write-Host "Scoop not available, falling back to winget for aria2c..." -ForegroundColor DarkGray
-        Install-IfMissing "aria2c" "aria2.aria2"
+    if (Test-RealCommand "aria2c") {
+        Write-Host "aria2c already installed"
+        return
     }
+
+    # Scoop handles portable apps well when it exists
+    if (Get-Command scoop -ErrorAction SilentlyContinue) {
+        Write-Host "Installing aria2c via scoop..."
+        try { scoop install aria2 } catch {
+            Write-Host "  scoop failed: $($_.Exception.Message)" -ForegroundColor DarkGray
+        }
+        Update-SessionPath
+        if (Test-RealCommand "aria2c") {
+            Write-Host "✔ aria2c ready (scoop)" -ForegroundColor Green
+            return
+        }
+    }
+
+    Install-Tool -Cmd "aria2c" -WingetId "aria2.aria2" -Fallback "Install-Aria2Direct"
 }
 
-Install-IfMissing "git" "Git.Git"
-Install-Scoop
-Install-IfMissing "yt-dlp" "yt-dlp.yt-dlp"
-Install-IfMissing "ffmpeg" "Gyan.FFmpeg"
-Install-Aria2
-Install-IfMissing "fastfetch" "Fastfetch-cli.Fastfetch"
-Install-IfMissing "exiftool" "OliverBetz.ExifTool"
-Install-Python
+function Install-Python {
+    if (Test-RealCommand "python") {
+        Write-Host "python already installed"
+        return
+    }
 
-# -------------------------------
-# POWERSHELL 7
-# -------------------------------
-if (-not (Get-Command pwsh -ErrorAction SilentlyContinue)) {
-
-    Write-Host "PowerShell 7 not found. Installing..." -ForegroundColor Cyan
+    $installed = $false
 
     if (Get-Command winget -ErrorAction SilentlyContinue) {
-        try {
-            winget install --id Microsoft.PowerShell -e --silent --accept-package-agreements --accept-source-agreements
-            Write-Host "✔ PowerShell 7 installed." -ForegroundColor Green
-            Write-Host "Restart PowerShell after setup to use the new features." -ForegroundColor Yellow
+        Write-Host "Installing python via winget..."
+        # A stale winget index can hide valid packages; refresh it first
+        try { winget source update | Out-Null } catch {}
+        winget install --id Python.Python.3 -e --source winget --silent --accept-package-agreements --accept-source-agreements
+        if ($LASTEXITCODE -eq 0) {
+            $installed = $true
+        } else {
+            Write-Host "winget could not install python (exit code $LASTEXITCODE)" -ForegroundColor Yellow
         }
-        catch {
-            Write-Host "✖ Failed to install PowerShell 7." -ForegroundColor Yellow
-        }
-    }
-    else {
-        Write-Host "winget not found. Please install PowerShell 7 manually." -ForegroundColor Yellow
     }
 
+    if (-not $installed) {
+        Write-Host "Downloading python from python.org..." -ForegroundColor Cyan
+        try {
+            $installerPath = Join-Path $env:TEMP "python-installer.exe"
+            Get-File -Url "https://www.python.org/ftp/python/3.13.5/python-3.13.5-amd64.exe" -OutFile $installerPath
+            Start-Process -FilePath $installerPath `
+                -ArgumentList "/quiet InstallAllUsers=0 PrependPath=1 Include_launcher=0" `
+                -Wait
+            Remove-Item $installerPath -ErrorAction SilentlyContinue
+            $installed = $true
+        } catch {
+            Write-Host "✖ Could not install python: $($_.Exception.Message)" -ForegroundColor Red
+            Write-Host "  Install it manually from https://www.python.org/downloads/" -ForegroundColor Yellow
+        }
+    }
+
+    Update-SessionPath
+    if (Test-RealCommand "python") {
+        Write-Host "✔ python installed" -ForegroundColor Green
+    }
 }
-else {
-    Write-Host "PowerShell 7 already installed"
-}
+
+# ---- Install the tools ----
+Install-Tool -Cmd "git"       -WingetId "Git.Git"                  -Fallback "Install-GitDirect"
+Install-Scoop
+Install-Tool -Cmd "yt-dlp"    -WingetId "yt-dlp.yt-dlp"            -Fallback "Install-YtDlpDirect"
+Install-Tool -Cmd "ffmpeg"    -WingetId "Gyan.FFmpeg"              -Fallback "Install-FfmpegDirect"
+Install-Aria2
+Install-Tool -Cmd "fastfetch" -WingetId "Fastfetch-cli.Fastfetch"  -Fallback "Install-FastfetchDirect"
+Install-Tool -Cmd "exiftool"  -WingetId "OliverBetz.ExifTool"      -Fallback "Install-ExiftoolDirect"
+Install-Python
+Install-Tool -Cmd "pwsh"      -WingetId "Microsoft.PowerShell"     -Fallback "Install-PwshDirect"
 
 # -------------------------------
 # POWERSHELL MODULES
 # -------------------------------
 Write-Host "`nInstalling PowerShell modules..." -ForegroundColor Cyan
 
+# A fresh PowerShell 5.1 (common on LTSC) has no NuGet provider, and
+# Install-Module would stop to ask for it. Install it quietly first.
+try {
+    Install-PackageProvider -Name NuGet -MinimumVersion 2.8.5.201 -Force -Scope CurrentUser | Out-Null
+} catch {
+    Write-Host "Could not install the NuGet provider: $($_.Exception.Message)" -ForegroundColor Yellow
+}
+
 function Install-PSModuleIfMissing {
-    param(
-        [string]$ModuleName
-    )
+    param([string]$ModuleName)
 
     $module = Get-Module -ListAvailable -Name $ModuleName
 
     if (-not $module) {
         Write-Host "Installing $ModuleName..."
-
         try {
-            Install-Module $ModuleName `
-                -Scope CurrentUser `
-                -Repository PSGallery `
-                -Force `
-                -AllowClobber
-
+            Install-Module $ModuleName -Scope CurrentUser -Repository PSGallery -Force -AllowClobber
             Write-Host "✔ Installed $ModuleName" -ForegroundColor Green
         }
         catch {
-            Write-Host "✖ Failed to install $ModuleName" -ForegroundColor Yellow
+            Write-Host "✖ Failed to install $ModuleName ($($_.Exception.Message))" -ForegroundColor Yellow
         }
     }
     else {
@@ -623,8 +716,7 @@ if (Get-Command scoop -ErrorAction SilentlyContinue) {
         $buckets = scoop bucket list | Out-String
 
         if ($buckets -match '(?m)^\s*extras\b') {
-            Write-Host "WARN  The 'extras' bucket already exists. To add this bucket again, first remove it by running 'scoop bucket rm extras'." -ForegroundColor Yellow
-            Write-Host "✔ Skipping Scoop extras bucket." -ForegroundColor Yellow
+            Write-Host "✔ Scoop extras bucket already present." -ForegroundColor Yellow
         }
         else {
             scoop bucket add extras
@@ -661,6 +753,18 @@ if (Test-RealCommand "python") {
     }
 } else {
     Write-Host "Python still not detected. Restart PowerShell and run 'update-scripts' again to retry." -ForegroundColor Yellow
+}
+
+# -------------------------------
+# TOOL CHECK
+# -------------------------------
+Write-Host "`n=== Tool check ===" -ForegroundColor Cyan
+foreach ($c in @("git", "yt-dlp", "ffmpeg", "aria2c", "fastfetch", "exiftool", "python", "pwsh")) {
+    if (Test-RealCommand $c) {
+        Write-Host "✔ $c" -ForegroundColor Green
+    } else {
+        Write-Host "✖ $c (missing)" -ForegroundColor Red
+    }
 }
 
 # -------------------------------
