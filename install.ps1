@@ -1,4 +1,4 @@
-$toolkitVersion = "1.2.10"
+$toolkitVersion = "1.2.11"
 Write-Host "ps1-scripts-win Version: $toolkitVersion"
 
 # ================================
@@ -168,6 +168,19 @@ function Add-ToUserPath {
     if (($env:PATH -split ';') -notcontains $Dir) {
         $env:PATH = "$env:PATH;$Dir"
     }
+}
+
+function Add-ToUserPathFirst {
+    # Like Add-ToUserPath, but puts the folder at the front, so the
+    # WindowsApps "python" alias can't shadow it.
+    param([string]$Dir)
+    if (-not $Dir) { return }
+
+    $user  = [Environment]::GetEnvironmentVariable("Path", "User")
+    $parts = @($user -split ';' | Where-Object { $_ -and $_ -ne $Dir })
+    [Environment]::SetEnvironmentVariable("Path", (@($Dir) + $parts) -join ';', "User")
+    $env:PATH = "$Dir;$env:PATH"
+    Write-Host "✔ Added to the front of PATH: $Dir" -ForegroundColor Green
 }
 
 function Update-SessionPath {
@@ -541,15 +554,37 @@ function Install-FastfetchDirect {
 }
 
 function Install-ExiftoolDirect {
-    # exiftool.org links the newest Windows zip from its front page
+    # Read the real download links from exiftool.org. The page can mention
+    # several versions and old zips get removed from the server, so the
+    # newest link is tried first and older ones only if it fails.
     $page = Invoke-WebRequest -Uri "https://exiftool.org/" -UseBasicParsing
-    $m = [regex]::Match($page.Content, 'exiftool-[\d.]+_64\.zip')
-    if (-not $m.Success) { throw "Could not find the ExifTool Windows download on exiftool.org." }
+
+    $links = [regex]::Matches($page.Content, 'href=["'']([^"'']*exiftool-(\d+\.\d+)_64\.zip)["'']') |
+        ForEach-Object {
+            [pscustomobject]@{
+                Url     = [Uri]::new([Uri]"https://exiftool.org/", $_.Groups[1].Value).AbsoluteUri
+                Version = [version]$_.Groups[2].Value
+            }
+        } |
+        Sort-Object Version -Descending
+
+    if (-not $links) { throw "No ExifTool Windows download link was found on exiftool.org." }
 
     $zip  = Join-Path $env:TEMP "exiftool.zip"
     $dest = Join-Path $toolsDir "exiftool"
 
-    Get-File -Url ("https://exiftool.org/" + $m.Value) -OutFile $zip
+    $downloaded = $false
+    foreach ($link in $links) {
+        try {
+            Get-File -Url $link.Url -OutFile $zip
+            $downloaded = $true
+            break
+        } catch {
+            Write-Host "  $($link.Url) failed, trying the next link" -ForegroundColor DarkGray
+        }
+    }
+    if (-not $downloaded) { throw "None of the ExifTool download links on exiftool.org worked." }
+
     Expand-Archive -Path $zip -DestinationPath $dest -Force
     Remove-Item $zip -ErrorAction SilentlyContinue
 
@@ -617,45 +652,87 @@ function Install-Aria2 {
     Install-Tool -Cmd "aria2c" -WingetId "aria2.aria2" -Fallback "Install-Aria2Direct"
 }
 
+function Find-PythonExe {
+    # Looks in the usual install folders, in case python is installed
+    # but PATH doesn't know about it yet.
+    $hits = @()
+    $hits += Get-ChildItem "$env:LOCALAPPDATA\Programs\Python\Python3*\python.exe" -ErrorAction SilentlyContinue
+    $hits += Get-ChildItem "$env:ProgramFiles\Python3*\python.exe" -ErrorAction SilentlyContinue
+    $hits += Get-ChildItem "$toolsDir\python\python.exe" -ErrorAction SilentlyContinue
+    return $hits | Select-Object -First 1
+}
+
+function Install-PythonEmbedded {
+    # Direct install that skips the python.org installer (msiexec), which can
+    # fail silently on locked-down LTSC images. The embeddable zip is just
+    # unpacked, and pip is added by hand.
+    $version = "3.13.5"
+    $dest    = Join-Path $toolsDir "python"
+    $zip     = Join-Path $env:TEMP "python-embed.zip"
+
+    Get-File -Url "https://www.python.org/ftp/python/$version/python-$version-embed-amd64.zip" -OutFile $zip
+    Expand-Archive -Path $zip -DestinationPath $dest -Force
+    Remove-Item $zip -ErrorAction SilentlyContinue
+
+    # The embeddable build ignores site-packages (where pip and every
+    # installed package live) until "import site" is switched on.
+    $pth = Get-ChildItem "$dest\python*._pth" | Select-Object -First 1
+    if (-not $pth) { throw "python._pth not found in the embeddable build." }
+    (Get-Content $pth.FullName) -replace '^#\s*import site', 'import site' |
+        Set-Content $pth.FullName -Encoding ASCII
+
+    $py     = Join-Path $dest "python.exe"
+    $getPip = Join-Path $env:TEMP "get-pip.py"
+    Get-File -Url "https://bootstrap.pypa.io/get-pip.py" -OutFile $getPip
+    & $py $getPip
+    if ($LASTEXITCODE -ne 0) { throw "get-pip.py failed (exit code $LASTEXITCODE)." }
+    Remove-Item $getPip -ErrorAction SilentlyContinue
+
+    Add-ToUserPathFirst (Join-Path $dest "Scripts")
+    Add-ToUserPathFirst $dest
+}
+
 function Install-Python {
     if (Test-RealCommand "python") {
         Write-Host "python already installed"
         return
     }
 
-    $installed = $false
-
-    if (Get-Command winget -ErrorAction SilentlyContinue) {
-        Write-Host "Installing python via winget..."
-        # A stale winget index can hide valid packages; refresh it first
-        try { winget source update | Out-Null } catch {}
-        winget install --id Python.Python.3 -e --source winget --silent --accept-package-agreements --accept-source-agreements
-        if ($LASTEXITCODE -eq 0) {
-            $installed = $true
-        } else {
-            Write-Host "winget could not install python (exit code $LASTEXITCODE)" -ForegroundColor Yellow
+    # Python may already be installed but missing from PATH (e.g. from an earlier run)
+    $found = Find-PythonExe
+    if ($found) {
+        Add-ToUserPathFirst $found.DirectoryName
+        if (Test-RealCommand "python") {
+            Write-Host "✔ python found at $($found.DirectoryName)" -ForegroundColor Green
+            return
         }
     }
 
-    if (-not $installed) {
-        Write-Host "Downloading python from python.org..." -ForegroundColor Cyan
-        try {
-            $installerPath = Join-Path $env:TEMP "python-installer.exe"
-            Get-File -Url "https://www.python.org/ftp/python/3.13.5/python-3.13.5-amd64.exe" -OutFile $installerPath
-            Start-Process -FilePath $installerPath `
-                -ArgumentList "/quiet InstallAllUsers=0 PrependPath=1 Include_launcher=0" `
-                -Wait
-            Remove-Item $installerPath -ErrorAction SilentlyContinue
-            $installed = $true
-        } catch {
-            Write-Host "✖ Could not install python: $($_.Exception.Message)" -ForegroundColor Red
-            Write-Host "  Install it manually from https://www.python.org/downloads/" -ForegroundColor Yellow
+    if (Get-Command winget -ErrorAction SilentlyContinue) {
+        Write-Host "Installing python via winget..."
+        try { winget source update | Out-Null } catch {}
+        winget install --id Python.Python.3 -e --source winget --silent --accept-package-agreements --accept-source-agreements
+        Update-SessionPath
+        if (Test-RealCommand "python") {
+            Write-Host "✔ python installed (winget)" -ForegroundColor Green
+            return
         }
+        Write-Host "winget did not leave a working python. Trying the direct download..." -ForegroundColor Yellow
+    } else {
+        Write-Host "winget not found, installing python directly..." -ForegroundColor DarkGray
+    }
+
+    try {
+        Install-PythonEmbedded
+    } catch {
+        Write-Host "✖ Direct install of python failed: $($_.Exception.Message)" -ForegroundColor Red
+        Write-Host "  Install it manually from https://www.python.org/downloads/" -ForegroundColor Yellow
+        return
     }
 
     Update-SessionPath
     if (Test-RealCommand "python") {
-        Write-Host "✔ python installed" -ForegroundColor Green
+        Write-Host "✔ python installed (direct download)" -ForegroundColor Green
     }
 }
 
@@ -675,12 +752,14 @@ Install-Tool -Cmd "pwsh"      -WingetId "Microsoft.PowerShell"     -Fallback "In
 # -------------------------------
 Write-Host "`nInstalling PowerShell modules..." -ForegroundColor Cyan
 
-# A fresh PowerShell 5.1 (common on LTSC) has no NuGet provider, and
-# Install-Module would stop to ask for it. Install it quietly first.
-try {
-    Install-PackageProvider -Name NuGet -MinimumVersion 2.8.5.201 -Force -Scope CurrentUser | Out-Null
-} catch {
-    Write-Host "Could not install the NuGet provider: $($_.Exception.Message)" -ForegroundColor Yellow
+# NuGet is only needed by Windows PowerShell 5.1, where Install-Module asks
+# for it. Skip it under PowerShell 7.
+if ($PSVersionTable.PSEdition -ne 'Core') {
+    try {
+        Install-PackageProvider -Name NuGet -MinimumVersion 2.8.5.201 -Force -Scope CurrentUser | Out-Null
+    } catch {
+        Write-Host "Could not install the NuGet provider: $($_.Exception.Message)" -ForegroundColor Yellow
+    }
 }
 
 function Install-PSModuleIfMissing {
