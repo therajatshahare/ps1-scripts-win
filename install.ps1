@@ -1,4 +1,4 @@
-$toolkitVersion = "1.2.11"
+$toolkitVersion = "1.2.12"
 Write-Host "ps1-scripts-win Version: $toolkitVersion"
 
 # ================================
@@ -554,39 +554,35 @@ function Install-FastfetchDirect {
 }
 
 function Install-ExiftoolDirect {
-    # Read the real download links from exiftool.org. The page can mention
-    # several versions and old zips get removed from the server, so the
-    # newest link is tried first and older ones only if it fails.
+    # exiftool.org publishes the Windows build as "exiftool-<version>_64.zip".
+    # Instead of relying on one link format, scan the whole page for that file
+    # name, try the newest version first, and move on if a download fails or
+    # the file isn't a valid zip.
     $page = Invoke-WebRequest -Uri "https://exiftool.org/" -UseBasicParsing
 
-    $links = [regex]::Matches($page.Content, 'href=["'']([^"'']*exiftool-(\d+\.\d+)_64\.zip)["'']') |
-        ForEach-Object {
-            [pscustomobject]@{
-                Url     = [Uri]::new([Uri]"https://exiftool.org/", $_.Groups[1].Value).AbsoluteUri
-                Version = [version]$_.Groups[2].Value
-            }
-        } |
-        Sort-Object Version -Descending
+    $names = [regex]::Matches($page.Content, 'exiftool-\d+(\.\d+)+_64\.zip') |
+        ForEach-Object { $_.Value } |
+        Select-Object -Unique |
+        Sort-Object { [version]([regex]::Match($_, '\d+(\.\d+)+').Value) } -Descending
 
-    if (-not $links) { throw "No ExifTool Windows download link was found on exiftool.org." }
+    if (-not $names) { throw "exiftool.org did not list a Windows zip." }
 
     $zip  = Join-Path $env:TEMP "exiftool.zip"
     $dest = Join-Path $toolsDir "exiftool"
+    $done = $false
 
-    $downloaded = $false
-    foreach ($link in $links) {
+    foreach ($name in $names) {
         try {
-            Get-File -Url $link.Url -OutFile $zip
-            $downloaded = $true
+            Get-File -Url "https://exiftool.org/$name" -OutFile $zip
+            Expand-Archive -Path $zip -DestinationPath $dest -Force
+            $done = $true
             break
         } catch {
-            Write-Host "  $($link.Url) failed, trying the next link" -ForegroundColor DarkGray
+            Write-Host "  $name failed, trying the next one" -ForegroundColor DarkGray
         }
     }
-    if (-not $downloaded) { throw "None of the ExifTool download links on exiftool.org worked." }
-
-    Expand-Archive -Path $zip -DestinationPath $dest -Force
     Remove-Item $zip -ErrorAction SilentlyContinue
+    if (-not $done) { throw "None of the exiftool.org downloads worked." }
 
     # The zip ships "exiftool(-k).exe"; the toolkit calls plain "exiftool"
     $exe = Get-ChildItem -Path $dest -Recurse -Filter "exiftool*.exe" -File |
@@ -650,6 +646,28 @@ function Install-Aria2 {
     }
 
     Install-Tool -Cmd "aria2c" -WingetId "aria2.aria2" -Fallback "Install-Aria2Direct"
+}
+
+function Install-Exiftool {
+    if (Test-RealCommand "exiftool") {
+        Write-Host "exiftool already installed"
+        return
+    }
+
+    # Scoop first: it already works on this machine and handles portable zips.
+    if (Get-Command scoop -ErrorAction SilentlyContinue) {
+        Write-Host "Installing exiftool via scoop..."
+        try { scoop install exiftool } catch {
+            Write-Host "  scoop failed: $($_.Exception.Message)" -ForegroundColor DarkGray
+        }
+        Update-SessionPath
+        if (Test-RealCommand "exiftool") {
+            Write-Host "✔ exiftool ready (scoop)" -ForegroundColor Green
+            return
+        }
+    }
+
+    Install-Tool -Cmd "exiftool" -WingetId "OliverBetz.ExifTool" -Fallback "Install-ExiftoolDirect"
 }
 
 function Find-PythonExe {
@@ -736,6 +754,28 @@ function Install-Python {
     }
 }
 
+function Add-PythonScriptsToPath {
+    # pip puts commands such as instaloader.exe in a Scripts folder that is not
+    # on PATH by default. Add it so the toolkit can run them.
+    if (-not (Test-RealCommand "python")) { return }
+    $dir = & python -c "import sysconfig; print(sysconfig.get_path('scripts'))" 2>$null |
+        Select-Object -First 1
+    if ($dir -and (Test-Path $dir)) { Add-ToUserPath $dir }
+}
+
+# The tools this toolkit needs. Name = Scoop package, Choco = Chocolatey
+# package, WingetId = winget package.
+$requiredTools = @(
+    @{ Cmd = "git";       Name = "git";       Choco = "git";             WingetId = "Git.Git" },
+    @{ Cmd = "yt-dlp";    Name = "yt-dlp";    Choco = "yt-dlp";          WingetId = "yt-dlp.yt-dlp" },
+    @{ Cmd = "ffmpeg";    Name = "ffmpeg";    Choco = "ffmpeg";          WingetId = "Gyan.FFmpeg" },
+    @{ Cmd = "aria2c";    Name = "aria2";     Choco = "aria2";           WingetId = "aria2.aria2" },
+    @{ Cmd = "fastfetch"; Name = "fastfetch"; Choco = "fastfetch";       WingetId = "Fastfetch-cli.Fastfetch" },
+    @{ Cmd = "exiftool";  Name = "exiftool";  Choco = "exiftool";        WingetId = "OliverBetz.ExifTool" },
+    @{ Cmd = "python";    Name = "python";    Choco = "python";          WingetId = "Python.Python.3" },
+    @{ Cmd = "pwsh";      Name = "pwsh";      Choco = "powershell-core"; WingetId = "Microsoft.PowerShell" }
+)
+
 # ---- Install the tools ----
 Install-Tool -Cmd "git"       -WingetId "Git.Git"                  -Fallback "Install-GitDirect"
 Install-Scoop
@@ -743,7 +783,7 @@ Install-Tool -Cmd "yt-dlp"    -WingetId "yt-dlp.yt-dlp"            -Fallback "In
 Install-Tool -Cmd "ffmpeg"    -WingetId "Gyan.FFmpeg"              -Fallback "Install-FfmpegDirect"
 Install-Aria2
 Install-Tool -Cmd "fastfetch" -WingetId "Fastfetch-cli.Fastfetch"  -Fallback "Install-FastfetchDirect"
-Install-Tool -Cmd "exiftool"  -WingetId "OliverBetz.ExifTool"      -Fallback "Install-ExiftoolDirect"
+Install-Exiftool
 Install-Python
 Install-Tool -Cmd "pwsh"      -WingetId "Microsoft.PowerShell"     -Fallback "Install-PwshDirect"
 
@@ -830,6 +870,8 @@ if (Test-RealCommand "python") {
     } catch {
         Write-Host "Could not install instaloader." -ForegroundColor Yellow
     }
+
+    Add-PythonScriptsToPath
 } else {
     Write-Host "Python still not detected. Restart PowerShell and run 'update-scripts' again to retry." -ForegroundColor Yellow
 }
@@ -838,11 +880,106 @@ if (Test-RealCommand "python") {
 # TOOL CHECK
 # -------------------------------
 Write-Host "`n=== Tool check ===" -ForegroundColor Cyan
-foreach ($c in @("git", "yt-dlp", "ffmpeg", "aria2c", "fastfetch", "exiftool", "python", "pwsh")) {
-    if (Test-RealCommand $c) {
-        Write-Host "✔ $c" -ForegroundColor Green
+foreach ($t in $requiredTools) {
+    if (Test-RealCommand $t.Cmd) {
+        Write-Host "✔ $($t.Cmd)" -ForegroundColor Green
     } else {
-        Write-Host "✖ $c (missing)" -ForegroundColor Red
+        Write-Host "✖ $($t.Cmd) (missing)" -ForegroundColor Red
+    }
+}
+
+# -------------------------------
+# MISSING TOOLS - look in other sources and ask before installing
+# -------------------------------
+function Ask-YesNo {
+    param([string]$Question)
+    $answer = Read-Host "$Question [y/N]"
+    return ($answer -match '^(y|yes)$')
+}
+
+function Find-ToolSources {
+    # Lists which package sources offer a tool. Scoop and Chocolatey are only
+    # checked if they are installed, and winget only if it exists.
+    param([string]$Name, [string]$ChocoName, [string]$WingetId)
+
+    $found = @()
+
+    if (Get-Command scoop -ErrorAction SilentlyContinue) {
+        $out = (scoop search $Name 2>&1 | Out-String)
+        if ($out -match "(?m)^\s*$([regex]::Escape($Name))\s") {
+            $found += [pscustomobject]@{ Source = "Scoop"; Id = $Name }
+        }
+    }
+
+    if (Get-Command choco -ErrorAction SilentlyContinue) {
+        $out = (choco search $ChocoName --exact --limit-output 2>&1 | Out-String)
+        if ($out -match "(?m)^$([regex]::Escape($ChocoName))\|") {
+            $found += [pscustomobject]@{ Source = "Chocolatey"; Id = $ChocoName }
+        }
+    }
+
+    if (Get-Command winget -ErrorAction SilentlyContinue) {
+        $out = (winget search --id $WingetId --exact 2>&1 | Out-String)
+        if ($out -match [regex]::Escape($WingetId)) {
+            $found += [pscustomobject]@{ Source = "winget"; Id = $WingetId }
+        }
+    }
+
+    return $found
+}
+
+function Install-FromSource {
+    param([string]$Source, [string]$Id)
+    switch ($Source) {
+        "Scoop"      { scoop install $Id }
+        "Chocolatey" { choco install $Id -y }
+        "winget"     { winget install --id $Id -e --silent --accept-package-agreements --accept-source-agreements }
+    }
+}
+
+Write-Host "`n=== Missing tools ===" -ForegroundColor Cyan
+$missing = @($requiredTools | Where-Object { -not (Test-RealCommand $_.Cmd) })
+
+if ($missing.Count -eq 0) {
+    Write-Host "Everything is installed." -ForegroundColor Green
+}
+elseif (-not [Environment]::UserInteractive) {
+    Write-Host "Missing: $($missing.Cmd -join ', ')" -ForegroundColor Yellow
+}
+else {
+    foreach ($t in $missing) {
+        Write-Host "`n$($t.Cmd) is missing. Checking other sources..." -ForegroundColor Yellow
+        $sources = @(Find-ToolSources -Name $t.Name -ChocoName $t.Choco -WingetId $t.WingetId)
+
+        if ($sources.Count -eq 0) {
+            Write-Host "  Not found in Scoop, Chocolatey or winget on this machine." -ForegroundColor DarkGray
+            Write-Host "  Install it by hand from the project's website." -ForegroundColor DarkGray
+            continue
+        }
+
+        $installed = $false
+        foreach ($s in $sources) {
+            if ($s.Source -eq "Chocolatey" -and -not $admin) {
+                Write-Host "  Chocolatey has $($t.Cmd), but installing needs an Administrator PowerShell window. Skipped." -ForegroundColor DarkGray
+                continue
+            }
+
+            if (-not (Ask-YesNo "  $($t.Cmd) is available from $($s.Source) ($($s.Id)). Install it?")) { continue }
+
+            Install-FromSource -Source $s.Source -Id $s.Id
+            Update-SessionPath
+
+            if (Test-RealCommand $t.Cmd) {
+                Write-Host "✔ $($t.Cmd) installed from $($s.Source)" -ForegroundColor Green
+                $installed = $true
+                break
+            }
+            Write-Host "  $($s.Source) did not leave a working $($t.Cmd)." -ForegroundColor Yellow
+        }
+
+        if (-not $installed) {
+            Write-Host "  $($t.Cmd) is still missing." -ForegroundColor Red
+        }
     }
 }
 
