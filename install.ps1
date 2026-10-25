@@ -1,4 +1,4 @@
-$toolkitVersion = "1.2.12"
+$toolkitVersion = "1.2.13"
 Write-Host "ps1-scripts-win Version: $toolkitVersion"
 
 # ================================
@@ -151,13 +151,46 @@ function Test-RealCommand {
     return $true
 }
 
+function Get-SplitPathEntries {
+    # Turns a PATH string into a list of entries. The old bug could glue several
+    # folder paths together with no ";" between them, so an entry is also split
+    # wherever a new drive path ("C:\") starts inside it.
+    param([string]$PathString)
+
+    $entries = @()
+    foreach ($entry in @($PathString -split ';')) {
+        if (-not $entry) { continue }
+        $entries += @([regex]::Split($entry, '(?=[A-Za-z]:\\)') | Where-Object { $_ })
+    }
+    return $entries
+}
+
+function Repair-UserPath {
+    # Fixes a User PATH that an earlier installer version left with entries
+    # glued together. Only rewrites the PATH when a glued entry is found.
+    $raw = [Environment]::GetEnvironmentVariable("Path", "User")
+    if ([string]::IsNullOrWhiteSpace($raw)) { return }
+
+    $glued = @($raw -split ';' | Where-Object { ([regex]::Matches($_, '[A-Za-z]:\\')).Count -gt 1 })
+    if ($glued.Count -eq 0) { return }
+
+    $fixed = (Get-SplitPathEntries $raw) -join ';'
+    [Environment]::SetEnvironmentVariable("Path", $fixed, "User")
+
+    # The current window still holds the glued text, so fix its copy too
+    $env:PATH = (@(Get-SplitPathEntries $env:PATH)) -join ';'
+
+    Write-Host "✔ Repaired the User PATH: split $($glued.Count) entry(ies) that were joined together" -ForegroundColor Green
+}
+
 function Add-ToUserPath {
     param([string]$Dir)
 
     if (-not $Dir) { return }
 
-    $currentPath = [Environment]::GetEnvironmentVariable("Path", "User")
-    $pathParts = $currentPath -split ';' | Where-Object { $_ -ne "" }
+    # @() keeps this an array even with one entry. Without it, a one-entry PATH
+    # comes back as a plain string, and "+" glues the new folder onto the old text.
+    $pathParts = @(Get-SplitPathEntries ([Environment]::GetEnvironmentVariable("Path", "User")))
 
     if ($pathParts -notcontains $Dir) {
         $newPath = ($pathParts + $Dir) -join ';'
@@ -305,26 +338,8 @@ foreach ($script in $scripts) {
 # -------------------------------
 # ADD TO USER PATH
 # -------------------------------
-$currentPath = [Environment]::GetEnvironmentVariable("Path", "User")
-
-if ([string]::IsNullOrWhiteSpace($currentPath)) {
-    $currentPath = ""
-}
-
-$pathParts = $currentPath -split ';' | Where-Object { $_ -ne "" }
-
-if ($pathParts -notcontains $targetDir) {
-    $newPath = ($pathParts + $targetDir) -join ';'
-    [Environment]::SetEnvironmentVariable("Path", $newPath, "User")
-    Write-Host "`nAdded to PATH (User)"
-} else {
-    Write-Host "`nPATH already configured"
-}
-
-# Update PATH for current session also
-if (($env:PATH -split ';') -notcontains $targetDir) {
-    $env:PATH = "$env:PATH;$targetDir"
-}
+Repair-UserPath
+Add-ToUserPath $targetDir
 
 # -------------------------------
 # PROFILE SETUP
